@@ -35,6 +35,8 @@ export default function OrgDashboard() {
   const [aiLoadingId, setAiLoadingId] = useState(null)
   const [sentimentData, setSentimentData] = useState({})
   const [sentimentLoadingId, setSentimentLoadingId] = useState(null)
+  const [dreamTeamData, setDreamTeamData] = useState({})
+  const [dreamTeamLoadingId, setDreamTeamLoadingId] = useState(null)
   const [formData, setFormData] = useState({
     title: '', description: '', category: '',
     skillsRequired: '', location: '', date: '',
@@ -85,6 +87,18 @@ export default function OrgDashboard() {
       showNotification('❌ Failed to load sentiment')
     } finally {
       setSentimentLoadingId(null)
+    }
+  }
+
+  const fetchDreamTeam = async (eventId) => {
+    try {
+      setDreamTeamLoadingId(eventId)
+      const res = await API.get(`/ai/dream-team/${eventId}`)
+      setDreamTeamData(prev => ({ ...prev, [eventId]: res.data }))
+    } catch (err) {
+      showNotification('❌ Failed to build dream team')
+    } finally {
+      setDreamTeamLoadingId(null)
     }
   }
 
@@ -617,6 +631,71 @@ export default function OrgDashboard() {
                               </div>
                             </div>
                           ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* AI Dream Team Builder */}
+                  <div className="mt-4 border-t pt-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <p className="text-sm font-semibold text-gray-700">🧩 AI Dream Team Builder</p>
+                      <button
+                        onClick={() => fetchDreamTeam(event._id)}
+                        disabled={dreamTeamLoadingId === event._id}
+                        className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition font-semibold disabled:opacity-60"
+                      >
+                        {dreamTeamLoadingId === event._id ? 'Building...' : 'Build Dream Team'}
+                      </button>
+                    </div>
+                    {dreamTeamData[event._id] && (
+                      <div className="flex flex-col gap-3">
+                        {dreamTeamData[event._id].team.length === 0 ? (
+                          <p className="text-xs text-gray-400 text-center py-3">
+                            No suitable candidates found to build a team yet
+                          </p>
+                        ) : (
+                          <>
+                            <div className="flex flex-wrap gap-2">
+                              <span className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded-lg font-medium">
+                                ✅ Covers {dreamTeamData[event._id].skillsCovered.length}/
+                                {(dreamTeamData[event._id].skillsCovered.length + dreamTeamData[event._id].skillsMissing.length)} required skills
+                              </span>
+                              {dreamTeamData[event._id].skillsMissing.length > 0 && (
+                                <span className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded-lg font-medium">
+                                  ⚠️ Missing: {dreamTeamData[event._id].skillsMissing.join(', ')}
+                                </span>
+                              )}
+                              <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg font-medium">
+                                📍 {dreamTeamData[event._id].locationSpread} location(s)
+                              </span>
+                              <span className="text-xs bg-yellow-50 text-yellow-700 px-2 py-1 rounded-lg font-medium">
+                                ⭐ Avg match {dreamTeamData[event._id].avgMatchScore}%
+                              </span>
+                            </div>
+
+                            <div className="flex flex-col gap-2">
+                              {dreamTeamData[event._id].team.map(member => (
+                                <div key={member.volunteer._id} className="flex justify-between items-center bg-indigo-50 rounded-xl px-4 py-3">
+                                  <div className="flex-1">
+                                    <p className="text-sm font-semibold text-gray-800">{member.volunteer.name}</p>
+                                    <p className="text-xs text-gray-500">
+                                      📍 {member.volunteer.location} · brings: {member.contributesSkills.length > 0 ? member.contributesSkills.join(', ') : 'general support'}
+                                    </p>
+                                  </div>
+                                  <div className="text-center ml-3">
+                                    <div className="text-lg font-black text-indigo-600">{member.matchScore}%</div>
+                                    <div className="text-xs text-gray-400">match</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="bg-gray-50 rounded-xl px-4 py-3">
+                              <p className="text-xs font-semibold text-gray-600 mb-1">🤖 Why this team works</p>
+                              <p className="text-xs text-gray-600 leading-relaxed">{dreamTeamData[event._id].explanation}</p>
+                            </div>
+                          </>
                         )}
                       </div>
                     )}

@@ -1,5 +1,10 @@
 const User = require('../models/User')
 const Event = require('../models/Event')
+const Anthropic = require('@anthropic-ai/sdk')
+
+const anthropicClient = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY
+})
 
 // -------- COSINE SIMILARITY --------
 const cosineSimilarity = (vecA, vecB) => {
@@ -188,6 +193,114 @@ const getVolunteerRecommendations = async (req, res) => {
         availability: volunteer.availability,
       },
       recommendations,
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message })
+  }
+}
+
+// -------- AI SKILL GAP GROWTH ADVISOR --------
+// Turns the matching engine around: instead of "what fits you now", this tells
+// a volunteer exactly which ONE skill to learn next to unlock the most new
+// upcoming events. Events where the volunteer is missing exactly one required
+// skill are "direct unlocks" for that skill; events missing that skill plus
+// others count as smaller "partial" progress.
+const getSkillGapAdvisor = async (req, res) => {
+  try {
+    const volunteer = await User.findById(req.user.id)
+    if (!volunteer) return res.status(404).json({ message: 'Volunteer not found' })
+
+    const volunteerSkills = new Set((volunteer.skills || []).map(s => s.toLowerCase().trim()))
+
+    const events = await Event.find({ status: 'upcoming' })
+    const registeredEventIds = events
+      .filter(e => e.registeredVolunteers.some(r => r.volunteer.toString() === req.user.id))
+      .map(e => e._id.toString())
+
+    const openEvents = events
+      .filter(e => !registeredEventIds.includes(e._id.toString()))
+      .filter(e => e.registeredVolunteers.length < e.volunteersNeeded)
+
+    let qualifiedCount = 0
+    const skillMap = {} // skill -> { directUnlocks: [], partialCount: number }
+
+    openEvents.forEach(event => {
+      const requiredSkills = (event.skillsRequired || []).map(s => s.toLowerCase().trim())
+      const missingSkills = requiredSkills.filter(s => !volunteerSkills.has(s))
+
+      if (missingSkills.length === 0) {
+        qualifiedCount += 1
+        return
+      }
+
+      missingSkills.forEach(skill => {
+        if (!skillMap[skill]) skillMap[skill] = { directUnlocks: [], partialCount: 0 }
+        if (missingSkills.length === 1) {
+          skillMap[skill].directUnlocks.push({ _id: event._id, title: event.title, date: event.date })
+        } else {
+          skillMap[skill].partialCount += 1
+        }
+      })
+    })
+
+    const suggestions = Object.entries(skillMap)
+      .map(([skill, data]) => ({
+        skill,
+        directUnlocks: data.directUnlocks,
+        directUnlockCount: data.directUnlocks.length,
+        partialUnlockCount: data.partialCount,
+        impactScore: data.directUnlocks.length * 2 + data.partialCount,
+      }))
+      .filter(s => s.impactScore > 0)
+      .sort((a, b) => b.impactScore - a.impactScore)
+      .slice(0, 5)
+
+    // -------- AI EXPLANATION (with deterministic fallback) --------
+    let explanation
+    const topSkill = suggestions[0]
+    try {
+      if (!topSkill) {
+        explanation = `You're already eligible for all ${qualifiedCount} open event(s) matching your skills right now. Keep an eye out for new events!`
+      } else {
+        const summary = suggestions
+          .map(s => `${s.skill} (unlocks ${s.directUnlockCount} event${s.directUnlockCount === 1 ? '' : 's'} directly${s.partialUnlockCount > 0 ? `, helps with ${s.partialUnlockCount} more` : ''})`)
+          .join('; ')
+
+        const message = await anthropicClient.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 180,
+          messages: [
+            {
+              role: 'user',
+              content: `You are a friendly growth coach for a volunteer on a volunteering platform.
+
+Volunteer's current skills: ${[...volunteerSkills].join(', ') || 'none listed'}.
+They are already eligible for ${qualifiedCount} open event(s).
+Skill opportunities ranked by impact: ${summary}.
+
+Write a short, motivating 2-3 sentence message (plain text, no markdown) that recommends they learn "${topSkill.skill}" next, mentioning how many events it would unlock. Encouraging and specific, not generic.`
+            }
+          ]
+        })
+        explanation = message.content[0].text.trim()
+      }
+    } catch (err) {
+      console.error('Skill gap explanation error:', err.message)
+      explanation = topSkill
+        ? `Learning "${topSkill.skill}" would make you eligible for ${topSkill.directUnlockCount} more event${topSkill.directUnlockCount === 1 ? '' : 's'} right away` +
+          (topSkill.partialUnlockCount > 0 ? `, and help with ${topSkill.partialUnlockCount} more.` : '.')
+        : `You're already eligible for all ${qualifiedCount} open event(s) matching your skills right now. Keep an eye out for new events!`
+    }
+
+    res.json({
+      volunteer: {
+        name: volunteer.name,
+        skills: volunteer.skills,
+      },
+      totalOpenEvents: openEvents.length,
+      qualifiedEvents: qualifiedCount,
+      suggestions,
+      explanation,
     })
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message })
@@ -419,6 +532,285 @@ const getEventSentimentReport = async (req, res) => {
   }
 }
 
+// -------- AI DREAM TEAM BUILDER --------
+// Instead of ranking individuals 1:1 against an event (see getEventRecommendations),
+// this picks the best COMBINATION of volunteers as a group: a greedy set-cover
+// over the event's required skills (to minimise redundant overlap), then fills
+// any remaining open slots using overall match score. A short AI-written
+// explanation (with a deterministic fallback) is returned alongside the team.
+const buildDreamTeam = async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.eventId)
+    if (!event) return res.status(404).json({ message: 'Event not found' })
+
+    const volunteers = await User.find({ role: 'volunteer' }).select('-password')
+    const registeredIds = event.registeredVolunteers.map(r => r.volunteer.toString())
+    const approvedCount = event.registeredVolunteers.filter(r => r.status === 'approved').length
+    const slotsOpen = Math.max(event.volunteersNeeded - approvedCount, 1)
+
+    const requiredSkills = (event.skillsRequired || []).map(s => s.toLowerCase().trim())
+
+    // Score every available (not yet registered) volunteer individually first
+    const candidates = volunteers
+      .filter(v => !registeredIds.includes(v._id.toString()))
+      .map(volunteer => {
+        const scores = calculateMatchScore(volunteer, event)
+        const volunteerSkills = (volunteer.skills || []).map(s => s.toLowerCase().trim())
+        return { volunteer, matchScore: scores.finalScore, volunteerSkills }
+      })
+      .filter(c => c.matchScore > 10)
+
+    if (candidates.length === 0) {
+      return res.json({
+        event: {
+          _id: event._id,
+          title: event.title,
+          skillsRequired: event.skillsRequired,
+          volunteersNeeded: event.volunteersNeeded,
+        },
+        slotsOpen,
+        team: [],
+        skillsCovered: [],
+        skillsMissing: requiredSkills,
+        avgMatchScore: 0,
+        locationSpread: 0,
+        explanation: 'No suitable candidates were found to build a team for this event yet.',
+      })
+    }
+
+    // -------- GREEDY SET-COVER --------
+    const covered = new Set()
+    const team = []
+    const remainingPool = [...candidates]
+
+    while (team.length < slotsOpen && remainingPool.length > 0) {
+      let bestIdx = -1
+      let bestNewSkillsCount = -1
+      let bestScore = -1
+
+      remainingPool.forEach((c, idx) => {
+        const newSkills = c.volunteerSkills.filter(s => requiredSkills.includes(s) && !covered.has(s))
+        if (
+          newSkills.length > bestNewSkillsCount ||
+          (newSkills.length === bestNewSkillsCount && c.matchScore > bestScore)
+        ) {
+          bestIdx = idx
+          bestNewSkillsCount = newSkills.length
+          bestScore = c.matchScore
+        }
+      })
+
+      // Once every required skill is covered, stop optimising for coverage
+      // and just fill remaining open slots with the strongest overall matches
+      if (bestNewSkillsCount <= 0 && covered.size >= requiredSkills.length) {
+        remainingPool.sort((a, b) => b.matchScore - a.matchScore)
+        const filler = remainingPool.shift()
+        if (!filler) break
+        team.push(filler)
+        continue
+      }
+
+      const chosen = remainingPool.splice(bestIdx, 1)[0]
+      chosen.volunteerSkills.forEach(s => {
+        if (requiredSkills.includes(s)) covered.add(s)
+      })
+      team.push(chosen)
+    }
+
+    const skillsCovered = requiredSkills.filter(s => covered.has(s))
+    const skillsMissing = requiredSkills.filter(s => !covered.has(s))
+    const uniqueLocations = new Set(team.map(t => t.volunteer.location?.toLowerCase().trim()))
+    const avgMatchScore = team.length > 0
+      ? Math.round(team.reduce((a, t) => a + t.matchScore, 0) / team.length)
+      : 0
+
+    const teamPayload = team.map(t => ({
+      volunteer: {
+        _id: t.volunteer._id,
+        name: t.volunteer.name,
+        email: t.volunteer.email,
+        location: t.volunteer.location,
+        skills: t.volunteer.skills,
+        availability: t.volunteer.availability,
+      },
+      matchScore: t.matchScore,
+      contributesSkills: t.volunteerSkills.filter(s => requiredSkills.includes(s)),
+    }))
+
+    // -------- AI EXPLANATION (with deterministic fallback) --------
+    let explanation
+    try {
+      const teamSummary = teamPayload
+        .map(t => `${t.volunteer.name} (${t.contributesSkills.join(', ') || 'general support'})`)
+        .join('; ')
+
+      const message = await anthropicClient.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 200,
+        messages: [
+          {
+            role: 'user',
+            content: `You are helping an event organizer understand why an AI-selected volunteer team is a good fit.
+
+Event: "${event.title}" needs skills: ${requiredSkills.join(', ') || 'none specified'}.
+Selected team: ${teamSummary}.
+Skills covered: ${skillsCovered.join(', ') || 'none'}.
+Skills still missing: ${skillsMissing.join(', ') || 'none'}.
+
+Write a short, encouraging 2-3 sentence explanation (plain text, no markdown, no headers) of why this combination of volunteers works well together for this event. Mention skill coverage and complementary strengths.`
+          }
+        ]
+      })
+      explanation = message.content[0].text.trim()
+    } catch (err) {
+      console.error('Dream team explanation error:', err.message)
+      explanation = `This team of ${team.length} volunteer(s) covers ${skillsCovered.length} of ${requiredSkills.length} required skills` +
+        (skillsMissing.length > 0 ? `, with ${skillsMissing.join(', ')} still uncovered.` : ' with no gaps.') +
+        ` Average match score is ${avgMatchScore}%.`
+    }
+
+    res.json({
+      event: {
+        _id: event._id,
+        title: event.title,
+        skillsRequired: event.skillsRequired,
+        volunteersNeeded: event.volunteersNeeded,
+      },
+      slotsOpen,
+      team: teamPayload,
+      skillsCovered,
+      skillsMissing,
+      avgMatchScore,
+      locationSpread: uniqueLocations.size,
+      explanation,
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message })
+  }
+}
+
+// -------- AI IMPACT STORY GENERATOR --------
+// A "Spotify Wrapped"-style personalized narrative built from a volunteer's own
+// completed-event stats (events, hours, top category, orgs). Defaults to the
+// current calendar month; if there's no activity this month it falls back to
+// an all-time summary so the feature is never empty for a demo. Purely reads
+// existing data plus one Anthropic call (with a deterministic fallback).
+const getImpactStory = async (req, res) => {
+  try {
+    const volunteer = await User.findById(req.user.id)
+    if (!volunteer) return res.status(404).json({ message: 'Volunteer not found' })
+
+    const completedEvents = await Event.find({
+      status: 'completed',
+      registeredVolunteers: {
+        $elemMatch: { volunteer: req.user.id, status: 'approved' }
+      }
+    })
+
+    const now = new Date()
+    const isThisMonth = (d) => {
+      const date = new Date(d)
+      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
+    }
+
+    let periodEvents = completedEvents.filter(e => isThisMonth(e.date))
+    let period = 'month'
+    let allTimeFallback = false
+
+    if (periodEvents.length === 0) {
+      periodEvents = completedEvents
+      period = 'all-time'
+      allTimeFallback = true
+    }
+
+    if (periodEvents.length === 0) {
+      return res.json({
+        volunteer: { name: volunteer.name },
+        period,
+        allTimeFallback,
+        hasActivity: false,
+        message: 'Complete your first event to unlock your Impact Story!',
+      })
+    }
+
+    const totalHours = periodEvents.reduce((sum, e) => sum + (parseFloat(e.duration) || 0), 0)
+
+    const categoryCounts = {}
+    periodEvents.forEach(e => {
+      categoryCounts[e.category] = (categoryCounts[e.category] || 0) + 1
+    })
+    const topCategory = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0][0]
+    const organizationsCount = new Set(periodEvents.map(e => e.orgName)).size
+
+    const badgeMap = {
+      education: '📚 Learning Champion',
+      environment: '🌱 Green Guardian',
+      health: '🩺 Wellness Warrior',
+      community: '🤝 Community Builder',
+      'disaster relief': '🚨 Relief Responder',
+      'animal welfare': '🐾 Animal Ally',
+      other: '⭐ All-Rounder',
+    }
+    const badge = badgeMap[topCategory] || '⭐ Impact Maker'
+
+    const eventList = periodEvents
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .map(e => ({
+        _id: e._id,
+        title: e.title,
+        category: e.category,
+        date: e.date,
+        orgName: e.orgName,
+        hours: parseFloat(e.duration) || 0,
+      }))
+
+    // -------- AI NARRATIVE (with deterministic fallback) --------
+    let story
+    try {
+      const message = await anthropicClient.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 220,
+        messages: [
+          {
+            role: 'user',
+            content: `Write a short, warm "Spotify Wrapped"-style personal impact summary for a volunteer, based on these stats for ${period === 'month' ? 'this month' : 'their volunteering journey so far'}:
+
+- Events completed: ${periodEvents.length}
+- Total hours: ${totalHours}
+- Top category: ${topCategory}
+- Organizations worked with: ${organizationsCount}
+- Events: ${eventList.map(e => `${e.title} (${e.category})`).join(', ')}
+
+Write 3-4 sentences, second person ("You..."), celebratory and specific, plain text, no markdown, no headers, no emoji.`
+          }
+        ]
+      })
+      story = message.content[0].text.trim()
+    } catch (err) {
+      console.error('Impact story generation error:', err.message)
+      story = `You completed ${periodEvents.length} event${periodEvents.length === 1 ? '' : 's'} and contributed ${totalHours} hour${totalHours === 1 ? '' : 's'} ${period === 'month' ? 'this month' : 'so far'}, mostly in ${topCategory}. Working with ${organizationsCount} organization${organizationsCount === 1 ? '' : 's'}, you're making a real difference — keep it up!`
+    }
+
+    res.json({
+      volunteer: { name: volunteer.name },
+      period,
+      allTimeFallback,
+      hasActivity: true,
+      stats: {
+        eventsCompleted: periodEvents.length,
+        totalHours,
+        topCategory,
+        organizationsCount,
+      },
+      badge,
+      events: eventList,
+      story,
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message })
+  }
+}
+
 module.exports = {
   getEventRecommendations,
   getVolunteerRecommendations,
@@ -426,4 +818,7 @@ module.exports = {
   markEventComplete,
   calculatePerformanceScore,
   getEventSentimentReport,
+  buildDreamTeam,
+  getSkillGapAdvisor,
+  getImpactStory,
 }

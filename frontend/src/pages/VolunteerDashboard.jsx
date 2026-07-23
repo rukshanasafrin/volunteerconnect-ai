@@ -18,6 +18,10 @@ export default function VolunteerDashboard() {
   const [aiLoading, setAiLoading] = useState(false)
   const [performance, setPerformance] = useState(null)
   const [perfLoading, setPerfLoading] = useState(false)
+  const [skillGap, setSkillGap] = useState(null)
+  const [skillGapLoading, setSkillGapLoading] = useState(false)
+  const [impactStory, setImpactStory] = useState(null)
+  const [impactStoryLoading, setImpactStoryLoading] = useState(false)
   const [feedbackModal, setFeedbackModal] = useState(null)
   const [feedbackForm, setFeedbackForm] = useState({ comment: '', rating: 5 })
   const [feedbackLoading, setFeedbackLoading] = useState(false)
@@ -27,6 +31,8 @@ export default function VolunteerDashboard() {
     fetchAll()
     fetchAiRecommendations()
     fetchPerformance()
+    fetchSkillGap()
+    fetchImpactStory()
   }, [])
 
   const fetchAll = async () => {
@@ -70,6 +76,30 @@ export default function VolunteerDashboard() {
     setPerfLoading(false)
   }
 }
+
+  const fetchSkillGap = async () => {
+    try {
+      setSkillGapLoading(true)
+      const res = await API.get('/ai/skill-gap')
+      setSkillGap(res.data)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSkillGapLoading(false)
+    }
+  }
+
+  const fetchImpactStory = async () => {
+    try {
+      setImpactStoryLoading(true)
+      const res = await API.get('/ai/impact-story')
+      setImpactStory(res.data)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setImpactStoryLoading(false)
+    }
+  }
 
   const showNotification = (msg) => {
     setNotification(msg)
@@ -312,6 +342,68 @@ export default function VolunteerDashboard() {
           </div>
         )}
 
+        {/* Skill Gap Growth Advisor */}
+        {activeTab === 'overview' && (
+          <div className="bg-white rounded-2xl shadow p-6 mt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <h3 className="font-bold text-gray-800">📈 Skill Gap Growth Advisor</h3>
+              {skillGapLoading && (
+                <span className="text-xs text-gray-400 animate-pulse">Analyzing...</span>
+              )}
+            </div>
+            {!skillGap && !skillGapLoading ? (
+              <div className="text-center py-8">
+                <p className="text-3xl mb-2">📊</p>
+                <p className="text-gray-400 text-sm">No growth data available yet</p>
+              </div>
+            ) : skillGap && skillGap.suggestions.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-3xl mb-2">🎉</p>
+                <p className="text-gray-700 text-sm font-semibold">You're eligible for all {skillGap.qualifiedEvents} open event(s) right now!</p>
+                <p className="text-gray-400 text-xs mt-1">{skillGap.explanation}</p>
+              </div>
+            ) : skillGap ? (
+              <div className="flex flex-col gap-4">
+                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-indigo-600 mb-1">🤖 AI Growth Tip</p>
+                  <p className="text-sm text-gray-700 leading-relaxed">{skillGap.explanation}</p>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  {skillGap.suggestions.map((s, idx) => (
+                    <div key={s.skill} className={`border rounded-xl p-4 ${idx === 0 ? 'border-primary bg-blue-50/40' : 'border-gray-100'}`}>
+                      <div className="flex justify-between items-center mb-2">
+                        <p className="text-sm font-semibold text-gray-800 capitalize">
+                          {idx === 0 && '🏆 '}{s.skill}
+                        </p>
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-semibold">
+                          unlocks {s.directUnlockCount} event{s.directUnlockCount === 1 ? '' : 's'}
+                        </span>
+                      </div>
+                      {s.partialUnlockCount > 0 && (
+                        <p className="text-xs text-gray-500 mb-2">+ helps with {s.partialUnlockCount} more event{s.partialUnlockCount === 1 ? '' : 's'}</p>
+                      )}
+                      {s.directUnlocks.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {s.directUnlocks.slice(0, 4).map(ev => (
+                            <span key={ev._id} className="text-xs bg-white border border-gray-200 text-gray-600 px-2 py-1 rounded-lg">
+                              {ev.title}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-xs text-gray-400 text-center">
+                  You're currently eligible for {skillGap.qualifiedEvents} of {skillGap.totalOpenEvents} open events
+                </p>
+              </div>
+            ) : null}
+          </div>
+        )}
+
         {/* ── EVENTS TAB ── */}
         {activeTab === 'events' && (
           <div className="flex flex-col gap-4">
@@ -492,6 +584,52 @@ export default function VolunteerDashboard() {
               ))}
             </div>
           </div>
+        </div>
+
+        {/* AI Impact Story Generator */}
+        <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-2xl shadow p-6 text-white overflow-hidden relative">
+          <div className="flex items-center gap-2 mb-4">
+            <h3 className="font-bold">✨ Your Impact Story</h3>
+            {impactStoryLoading && (
+              <span className="text-xs opacity-70 animate-pulse">Writing your story...</span>
+            )}
+          </div>
+
+          {!impactStory && !impactStoryLoading ? (
+            <p className="text-sm opacity-80 py-6 text-center">No impact data available yet</p>
+          ) : impactStory && !impactStory.hasActivity ? (
+            <div className="text-center py-6">
+              <p className="text-3xl mb-2">🌱</p>
+              <p className="text-sm opacity-90">{impactStory.message}</p>
+            </div>
+          ) : impactStory ? (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs uppercase tracking-wide opacity-70">
+                  {impactStory.period === 'month' ? "This Month" : "All-Time Wrap"}
+                </span>
+                <span className="text-sm font-semibold bg-white/20 px-3 py-1 rounded-full">
+                  {impactStory.badge}
+                </span>
+              </div>
+
+              <p className="text-sm leading-relaxed opacity-95">{impactStory.story}</p>
+
+              <div className="grid grid-cols-4 gap-3">
+                {[
+                  { label: 'Events', value: impactStory.stats.eventsCompleted },
+                  { label: 'Hours', value: impactStory.stats.totalHours },
+                  { label: 'Top Category', value: impactStory.stats.topCategory, capitalize: true },
+                  { label: 'Organizations', value: impactStory.stats.organizationsCount },
+                ].map(stat => (
+                  <div key={stat.label} className="bg-white/10 rounded-xl p-3 text-center">
+                    <div className={`text-lg font-black ${stat.capitalize ? 'capitalize' : ''}`}>{stat.value}</div>
+                    <div className="text-xs opacity-70">{stat.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {/* Score Breakdown */}
