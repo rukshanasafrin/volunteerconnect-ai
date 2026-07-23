@@ -4,9 +4,6 @@ import { useAuth } from '../context/AuthContext'
 import EditProfileForm from '../components/EditProfileForm'
 import API from '../api'
 
-import LoadingSpinner from '../components/LoadingSpinner'
-
-if (loading) return <LoadingSpinner message="Loading your dashboard..." />
 
 export default function VolunteerDashboard() {
   const { user, logout } = useAuth()

@@ -3,10 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import API from '../api'
 
-import LoadingSpinner from '../components/LoadingSpinner'
-
-if (loading) return <LoadingSpinner message="Loading your dashboard..." />
-
 export default function AdminDashboard() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()

@@ -4,9 +4,6 @@ import { useAuth } from '../context/AuthContext'
 import EditOrgProfileForm from '../components/EditOrgProfileForm'
 import API from '../api'
 
-import LoadingSpinner from '../components/LoadingSpinner'
-
-if (loading) return <LoadingSpinner message="Loading your dashboard..." />
 
 // ✅ OUTSIDE component — fixes typing bug
 const FormInput = ({ label, name, value, onChange, error, type = 'text', placeholder }) => (
