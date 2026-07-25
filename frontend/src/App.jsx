@@ -1,7 +1,7 @@
 import { useLocation } from 'react-router-dom'
 import AppRoutes from './routes/AppRoutes'
 import Navbar from './components/Navbar'
-
+import ScoutChat from './components/ScoutChat'
 const HIDE_NAVBAR = [
   '/volunteer/dashboard',
   '/org/dashboard',
@@ -16,6 +16,7 @@ function App() {
     <div className="min-h-screen bg-gray-50">
       {!hideNav && <Navbar />}
       <AppRoutes />
+      <ScoutChat />
     </div>
   )
 }

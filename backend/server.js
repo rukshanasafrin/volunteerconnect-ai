@@ -20,7 +20,7 @@ app.use(express.urlencoded({ extended: true }))
 app.use('/api/auth', require('./routes/authRoutes'))
 app.use('/api/events', require('./routes/eventRoutes'))
 app.use('/api/ai', require('./routes/aiRoutes'))
-
+app.use('/api/chat', require('./routes/chatRoutes'))
 // Health check
 app.get('/', (req, res) => {
   res.json({ message: 'VolunteerConnect API is running ✅' })
