@@ -116,6 +116,21 @@ export default function VolunteerDashboard() {
       showNotification(`❌ ${err.response?.data?.message || 'Registration failed'}`)
     }
   }
+  const handleDownloadCertificate = async (eventId) => {
+    try {
+      const res = await API.get(`/certificates/event/${eventId}/download`, { responseType: 'blob' })
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', 'certificate.pdf')
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      showNotification(`❌ ${err.response?.data?.message || 'Could not download certificate right now.'}`)
+    }
+  }
 
   const handleLogout = () => {
     logout()
@@ -524,14 +539,18 @@ export default function VolunteerDashboard() {
                     <h4 className="font-bold text-gray-800">{event.title}</h4>
                     <p className="text-sm text-gray-500">{event.orgName} · {new Date(event.date).toLocaleDateString()}</p>
                   </div>
-                  <button className="text-sm bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
-                    Download PDF
-                  </button>
+                  <button
+  onClick={() => handleDownloadCertificate(event._id)}
+  className="text-sm bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+>
+  Download PDF
+</button>
                 </div>
               ))
             )}
           </div>
         )}
+        
 
 
         {/* ── PERFORMANCE TAB ── */}

@@ -6,7 +6,10 @@ import VolunteerDashboard from '../pages/VolunteerDashboard'
 import OrgDashboard from '../pages/OrgDashboard'
 import AdminDashboard from '../pages/AdminDashboard'
 import { useAuth } from '../context/AuthContext'
+import VerifyCertificate from '../pages/VerifyCertificate' 
 
+// ...inside <Routes>, alongside your other public routes:
+<Route path="/verify/:certificateId" element={<VerifyCertificate />}/> 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth()
