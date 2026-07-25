@@ -25,7 +25,7 @@ export default function Navbar() {
 
       <div className="flex gap-6 text-gray-600 font-medium items-center">
         <Link to="/" className="hover:text-primary transition">Home</Link>
-
+        <Link to="/leaderboard" className="hover:text-primary transition">Leaderboard</Link>
         {user ? (
           // Logged in state
           <>

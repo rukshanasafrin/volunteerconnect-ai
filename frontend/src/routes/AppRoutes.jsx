@@ -5,11 +5,10 @@ import Register from '../pages/Register'
 import VolunteerDashboard from '../pages/VolunteerDashboard'
 import OrgDashboard from '../pages/OrgDashboard'
 import AdminDashboard from '../pages/AdminDashboard'
+import Leaderboard from '../pages/Leaderboard'
+import VerifyCertificate from '../pages/VerifyCertificate'
 import { useAuth } from '../context/AuthContext'
-import VerifyCertificate from '../pages/VerifyCertificate' 
 
-// ...inside <Routes>, alongside your other public routes:
-<Route path="/verify/:certificateId" element={<VerifyCertificate />}/> 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth()
@@ -43,6 +42,8 @@ export default function AppRoutes() {
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/leaderboard" element={<Leaderboard />} />
+      <Route path="/verify/:certificateId" element={<VerifyCertificate />} />
 
       {/* Volunteer Protected */}
       <Route path="/volunteer/dashboard" element={
