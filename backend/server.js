@@ -21,6 +21,7 @@ app.use('/api/auth', require('./routes/authRoutes'))
 app.use('/api/events', require('./routes/eventRoutes'))
 app.use('/api/ai', require('./routes/aiRoutes'))
 app.use('/api/chat', require('./routes/chatRoutes'))
+app.use('/api/admin',require('./routes/adminRoutes'))
 app.use('/api/certificates', require('./routes/certificateRoutes'))
 app.use('/api/leaderboard', require('./routes/leaderboardRoutes'))
 // Health check

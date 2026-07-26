@@ -43,6 +43,7 @@ const userSchema = new mongoose.Schema({
   eventsAttended: { type: Number, default: 0 },
   performanceScore: { type: Number, default: 0 },
 
+
 }, { timestamps: true })
 
 

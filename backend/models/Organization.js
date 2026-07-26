@@ -43,6 +43,8 @@ const organizationSchema = new mongoose.Schema({
   isVerified: { type: Boolean, default: false },
   verifiedAt: { type: Date },
 
+
+
 }, { timestamps: true })
 
 organizationSchema.index({ isVerified: 1 })

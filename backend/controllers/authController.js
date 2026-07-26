@@ -3,8 +3,8 @@ const Organization = require('../models/Organization')
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 
-const generateToken = (id, role) => {
-  return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '7d' })
+const generateToken = (id, role, name) => {
+  return jwt.sign({ id, role, name }, process.env.JWT_SECRET, { expiresIn: '7d' })
 }
 
 // -------- REGISTER VOLUNTEER --------
@@ -20,7 +20,7 @@ const registerVolunteer = async (req, res) => {
       availability,
       languages: languages ? languages.split(',').map(l => l.trim()).filter(Boolean) : [],
     })
-    const token = generateToken(user._id, 'volunteer')
+    const token = generateToken(user._id, 'volunteer', user.name)
     res.status(201).json({
       message: 'Volunteer registered successfully',
       token,
@@ -60,12 +60,32 @@ const registerOrganization = async (req, res) => {
   }
 }
 
-// -------- LOGIN --------
+// -------- LOGIN (volunteer, org — admin is detected silently, never advertised) --------
 const login = async (req, res) => {
   try {
     const { email, password, role } = req.body
+
+    // Silent admin path: if this email belongs to an admin account and the
+    // password matches, log them in as admin — regardless of which tab
+    // (volunteer/org) they had selected. Nothing in the UI or API surface
+    // reveals this path exists; it's just "the login form" from the
+    // outside. Falls through to the normal flow if it's not an admin match.
+    const possibleAdmin = await User.findOne({ email, role: 'admin' })
+    if (possibleAdmin) {
+      const adminMatch = await bcrypt.compare(password, possibleAdmin.password)
+      if (adminMatch) {
+        const token = generateToken(possibleAdmin._id, 'admin', possibleAdmin.name)
+        return res.json({
+          message: 'Login successful',
+          token,
+          user: { id: possibleAdmin._id, name: possibleAdmin.name, email: possibleAdmin.email, role: 'admin' },
+        })
+      }
+      return res.status(401).json({ message: 'Incorrect password' })
+    }
+
     let account = null
-    if (role === 'volunteer' || role === 'admin') {
+    if (role === 'volunteer') {
       account = await User.findOne({ email })
     } else if (role === 'org') {
       account = await Organization.findOne({ email })
@@ -76,10 +96,7 @@ const login = async (req, res) => {
     if (role === 'org' && !account.isVerified) {
       return res.status(403).json({ message: 'Your organization is pending admin verification.' })
     }
-    if (role === 'admin' && account.role !== 'admin') {
-      return res.status(403).json({ message: 'Access denied' })
-    }
-    const token = generateToken(account._id, role)
+    const token = generateToken(account._id, role, account.name)
     res.json({
       message: 'Login successful', token,
       user: {

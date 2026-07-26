@@ -39,10 +39,12 @@ export default function Login() {
       const res = await API.post('/auth/login', formData)
       login(res.data.user, res.data.token)
 
-      // Redirect based on role
-      if (res.data.user.role === 'volunteer') navigate('/volunteer/dashboard')
-      else if (res.data.user.role === 'org') navigate('/org/dashboard')
-      else navigate('/admin/dashboard')
+      // Redirect based on the role the server actually returns —
+      // this may be 'admin' even if the volunteer/org tab was selected,
+      // since admin login is detected silently by the backend.
+      if (res.data.user.role === 'admin') navigate('/admin/dashboard')
+      else if (res.data.user.role === 'volunteer') navigate('/volunteer/dashboard')
+      else navigate('/org/dashboard')
 
     } catch (err) {
       setServerError(err.response?.data?.message || 'Login failed. Please try again.')
@@ -62,7 +64,7 @@ export default function Login() {
 
         {/* Role Selector */}
         <div className="flex rounded-xl overflow-hidden border border-gray-200 mb-6">
-          {['volunteer', 'org', 'admin'].map((role) => (
+          {['volunteer', 'org'].map((role) => (
             <button
               key={role}
               onClick={() => setFormData({ ...formData, role })}

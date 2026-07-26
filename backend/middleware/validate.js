@@ -47,9 +47,10 @@ const validateOrgRegister = [
 const validateLogin = [
   body('email').trim().isEmail().withMessage('Enter a valid email').normalizeEmail(),
   body('password').notEmpty().withMessage('Password is required'),
-  body('role').isIn(['volunteer', 'org', 'admin']).withMessage('Invalid role'),
+  body('role').isIn(['volunteer', 'org']).withMessage('Invalid role'),
   checkValidation
 ]
+
 
 // Event Validation
 const validateEvent = [
