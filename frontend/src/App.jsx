@@ -1,25 +1,39 @@
-import { useLocation } from 'react-router-dom'
-import AppRoutes from './routes/AppRoutes'
-import Navbar from './components/Navbar'
-import ScoutChat from './components/ScoutChat'
+import { useLocation } from "react-router-dom";
+import AppRoutes from "./routes/AppRoutes";
+import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
+import ScoutChat from "./components/ScoutChat";
 
-const HIDE_NAVBAR = [
-  '/volunteer/dashboard',
-  '/org/dashboard',
-  '/admin/dashboard'
-]
+const HIDE_LAYOUT = [
+  "/volunteer/dashboard",
+  "/org/dashboard",
+  "/admin/dashboard",
+];
 
 function App() {
-  const location = useLocation()
-  const hideNav = HIDE_NAVBAR.some(path => location.pathname.startsWith(path))
+  const location = useLocation();
+
+  const hideLayout = HIDE_LAYOUT.some((path) =>
+    location.pathname.startsWith(path)
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {!hideNav && <Navbar />}
-      <AppRoutes />
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+      {/* Public Navbar */}
+      {!hideLayout && <Navbar />}
+
+      {/* Main Content */}
+      <main className="flex-1">
+        <AppRoutes />
+      </main>
+
+      {/* Public Footer */}
+      {!hideLayout && <Footer />}
+
+      {/* Floating AI Assistant */}
       <ScoutChat />
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
