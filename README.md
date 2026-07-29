@@ -5,7 +5,6 @@
   <img src="https://img.shields.io/badge/Node.js-Express-green?logo=node.js" />
   <img src="https://img.shields.io/badge/MongoDB-Database-green?logo=mongodb" />
   <img src="https://img.shields.io/badge/TailwindCSS-3.x-38BDF8?logo=tailwindcss" />
-  <img src="https://img.shields.io/badge/License-MIT-blue" />
 </p>
 
 VolunteerConnect AI is a modern AI-powered volunteer management platform that connects volunteers with organizations through intelligent event matching, performance tracking, sentiment analysis, and streamlined event management.
@@ -22,11 +21,11 @@ The platform enables volunteers to discover meaningful opportunities while helpi
 - Profile Management
 - Browse & Search Events
 - Register for Volunteer Events
-- AI Event Recommendations
 - Volunteer Performance Score
 - Feedback Submission
 - Certificate Download
 - AI Chat Assistant 
+- Skill Gap Growth Advisor
 
 ---
 
@@ -39,6 +38,8 @@ The platform enables volunteers to discover meaningful opportunities while helpi
 - Event Completion Tracking
 - Feedback Sentiment Analysis
 - Volunteer Analytics
+- AI Dream Team Builder
+- AI Impact Story Generator
 
 ---
 
@@ -221,10 +222,7 @@ Supported roles
 
 # 🚀 Future Enhancements
 
-- AI Chat Assistant
-- PDF Certificate Generator
 - Socket.IO Real-Time Notifications
-- Volunteer Leaderboard
 - Achievement Badges
 - Calendar Integration
 - Resume Parsing
@@ -233,90 +231,5 @@ Supported roles
 - Multi-language Support
 - Cloud Deployment
 - Mobile App
-
----
-
-# 🌐 API Endpoints
-
-## Authentication
-
-```
-POST /api/auth/register
-
-POST /api/auth/login
-```
-
----
-
-## Volunteers
-
-```
-GET /api/volunteers
-
-GET /api/volunteers/profile
-
-PUT /api/volunteers/profile
-```
-
----
-
-## Organizations
-
-```
-POST /api/events
-
-GET /api/events
-
-PUT /api/events/:id
-
-DELETE /api/events/:id
-```
-
----
-
-## Admin
-
-```
-GET /api/admin/dashboard
-
-GET /api/admin/users
-
-PUT /api/admin/organizations/:id/verify
-```
-
----
-
-# 📦 Environment Variables
-
-Backend requires the following variables
-
-```env
-PORT=
-
-MONGO_URI=
-
-JWT_SECRET=
-
-ANTHROPIC_API_KEY=
-
-GROQ_API_KEY=
-
-```
-
----
-
-# 📈 Future Enhancements
-
-- AI Chatbot with Context Memory
-- Smart Volunteer Recommendation
-- Certificate Verification using QR Code
-- Real-Time Notifications
-- Interactive Analytics Dashboard
-- Event Calendar
-- Resume Upload & Skill Extraction
-- Volunteer Achievement System
-- Organization Insights
-- Cloud Deployment (Render/Vercel)
-- Progressive Web App (PWA)
 
 ---
