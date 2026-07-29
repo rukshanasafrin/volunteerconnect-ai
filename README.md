@@ -1,55 +1,83 @@
 # 🤝 VolunteerConnect AI
 
-VolunteerConnect AI is an AI-powered volunteer management platform that connects volunteers with organizations through intelligent matching, performance tracking, and sentiment analysis.
+<p align="center">
+  <img src="https://img.shields.io/badge/React-19-blue?logo=react" />
+  <img src="https://img.shields.io/badge/Node.js-Express-green?logo=node.js" />
+  <img src="https://img.shields.io/badge/MongoDB-Database-green?logo=mongodb" />
+  <img src="https://img.shields.io/badge/TailwindCSS-3.x-38BDF8?logo=tailwindcss" />
+  <img src="https://img.shields.io/badge/License-MIT-blue" />
+</p>
+
+VolunteerConnect AI is a modern AI-powered volunteer management platform that connects volunteers with organizations through intelligent event matching, performance tracking, sentiment analysis, and streamlined event management.
+
+The platform enables volunteers to discover meaningful opportunities while helping organizations efficiently manage volunteers and events through AI-assisted features.
 
 ---
 
-# Features
+# 🌟 Key Features
 
-## Volunteer
+## 👤 Volunteer
 
-- User Registration & Login
-- Edit Profile
-- Browse Events
-- Register for Events
-- AI Recommended Events
-- Performance Score
+- Secure Registration & Login
+- Profile Management
+- Browse & Search Events
+- Register for Volunteer Events
+- AI Event Recommendations
+- Volunteer Performance Score
 - Feedback Submission
-- Certificate Download (Upcoming)
-- AI Chatbot (Upcoming)
+- Certificate Download
+- AI Chat Assistant 
 
 ---
 
-## Organization
+## 🏢 Organization
 
 - Organization Registration
-- Create Events
-- Manage Events
-- Approve/Reject Volunteers
+- Event Creation & Management
+- Volunteer Approval / Rejection
 - AI Volunteer Matching
-- Event Completion
+- Event Completion Tracking
 - Feedback Sentiment Analysis
+- Volunteer Analytics
 
 ---
 
-## Admin
+## 🛡️ Admin
 
-- Verify Organizations
-- View Volunteers
+- Organization Verification
+- Volunteer Management
+- Organization Management
+- Event Monitoring
 - Search Users
 - Dashboard Analytics
+- Platform Statistics
 
 ---
 
-# Tech Stack
+# 🤖 AI Features
+
+- AI Volunteer Recommendation Engine
+- Volunteer Performance Scoring
+- Feedback Sentiment Analysis
+- Smart Event Matching
+- AI Chat Assistant
+- Certificate Generation 
+
+---
+
+# 🛠 Tech Stack
 
 ## Frontend
 
 - React.js
 - Vite
 - Tailwind CSS
+- Framer Motion
 - Axios
-- React Router
+- React Router DOM
+- Lucide React
+
+---
 
 ## Backend
 
@@ -57,44 +85,59 @@ VolunteerConnect AI is an AI-powered volunteer management platform that connects
 - Express.js
 - MongoDB
 - JWT Authentication
+- Bcrypt
+- Mongoose
 
-## AI
+---
+
+## Artificial Intelligence
 
 - Anthropic Claude API
 - Sentiment Analysis
 - AI Volunteer Matching
-- Performance Scoring
+- Recommendation Engine
 
 ---
 
-# Project Structure
+# 📂 Project Structure
 
 ```
-volunteerconnect
+volunteerconnect-ai
 │
 ├── frontend
+│   ├── public
 │   ├── src
-│   │   ├── pages
+│   │   ├── api
+│   │   ├── assets
 │   │   ├── components
 │   │   ├── context
+│   │   ├── pages
 │   │   ├── routes
-│   │   └── api.js
+│   │   ├── hooks
+│   │   └── utils
+│   │
+│   ├── package.json
+│   └── vite.config.js
 │
-└── backend
-    ├── config
-    ├── controllers
-    ├── middleware
-    ├── models
-    ├── routes
-    ├── services
-    └── server.js
+├── backend
+│   ├── config
+│   ├── controllers
+│   ├── middleware
+│   ├── models
+│   ├── routes
+│   ├── services
+│   ├── utils
+│   ├── package.json
+│   └── server.js
+│
+└── README.md
 ```
 
 ---
 
-# Installation
+# 🚀 Getting Started
 
-## Clone Repository
+## 1️⃣ Clone Repository
 
 ```bash
 git clone https://github.com/rukshanasafrin/volunteerconnect-ai.git
@@ -104,7 +147,7 @@ cd volunteerconnect-ai
 
 ---
 
-## Backend
+# ⚙ Backend Setup
 
 ```bash
 cd backend
@@ -114,25 +157,33 @@ npm install
 
 Create a `.env` file inside the backend folder.
 
-```
-PORT=8000
+```env
+PORT=PORT_NUMBER
 
-MONGO_URI=mongodb://localhost:27017/volunteerconnect
+MONGO_URI=YOUR_MONGODB_URL
 
-JWT_SECRET=volunteerconnect_super_secret_key_2026
+JWT_SECRET=YOUR_JWT_KEY
 
 ANTHROPIC_API_KEY=YOUR_API_KEY
+
+GROQ_API_KEY=YOUR_GRQO_API_KEY
 ```
 
-Start Backend
+Start the backend server
 
 ```bash
 npm run dev
 ```
 
+Backend runs at
+
+```
+http://localhost:8000
+```
+
 ---
 
-## Frontend
+# 💻 Frontend Setup
 
 ```bash
 cd frontend
@@ -142,93 +193,130 @@ npm install
 npm run dev
 ```
 
----
-
-# Application URLs
-
-Frontend
+Frontend runs at
 
 ```
 http://localhost:5173
 ```
 
-Backend
+---
 
-```
-http://localhost:8000
-```
+# 🔐 Authentication
+
+The platform uses
+
+- JWT Authentication
+- Password Hashing using Bcrypt
+- Protected Routes
+- Role-Based Authorization
+
+Supported roles
+
+- Volunteer
+- Organization
+- Admin
 
 ---
 
-# Current Progress
 
-## Phase 1 – Fix & Polish
+# 🚀 Future Enhancements
 
-- ✅ Completed
-
-## Phase 2 – UI Overhaul
-
-- ✅ Completed
-
-## Phase 3 – AI Features
-
-- ✅ AI Volunteer Matching
-- ✅ Volunteer Performance Score
-- ✅ Sentiment Analysis
-- 🔄 Smart Certificate Generator
-- 🔄 AI Chatbot
-
-## Phase 4 – Live Notifications
-
-- ⏳ Pending
-
-## Phase 5 – Leaderboard & Badges
-
-- ⏳ Pending
-
-## Phase 6 – Deployment
-
-- ⏳ Pending
-
----
-
-# Upcoming Features
-
+- AI Chat Assistant
 - PDF Certificate Generator
-- AI Chatbot
-- Socket.IO Notifications
+- Socket.IO Real-Time Notifications
 - Volunteer Leaderboard
 - Achievement Badges
-- Render Deployment
-
----
-
-# Environment Variables
-
-Backend requires:
-
-```
-PORT
-
-MONGO_URI
-
-JWT_SECRET
-
-ANTHROPIC_API_KEY
-```
-
----
-
-
-# Future Improvements
-
-- Email Notifications
-- Mobile Responsive Enhancements
 - Calendar Integration
+- Resume Parsing
+- Email Notifications
 - Analytics Dashboard
 - Multi-language Support
 - Cloud Deployment
-- Resume Parsing
-- Volunteer Recommendation Improvements
+- Mobile App
+
+---
+
+# 🌐 API Endpoints
+
+## Authentication
+
+```
+POST /api/auth/register
+
+POST /api/auth/login
+```
+
+---
+
+## Volunteers
+
+```
+GET /api/volunteers
+
+GET /api/volunteers/profile
+
+PUT /api/volunteers/profile
+```
+
+---
+
+## Organizations
+
+```
+POST /api/events
+
+GET /api/events
+
+PUT /api/events/:id
+
+DELETE /api/events/:id
+```
+
+---
+
+## Admin
+
+```
+GET /api/admin/dashboard
+
+GET /api/admin/users
+
+PUT /api/admin/organizations/:id/verify
+```
+
+---
+
+# 📦 Environment Variables
+
+Backend requires the following variables
+
+```env
+PORT=
+
+MONGO_URI=
+
+JWT_SECRET=
+
+ANTHROPIC_API_KEY=
+
+GROQ_API_KEY=
+
+```
+
+---
+
+# 📈 Future Enhancements
+
+- AI Chatbot with Context Memory
+- Smart Volunteer Recommendation
+- Certificate Verification using QR Code
+- Real-Time Notifications
+- Interactive Analytics Dashboard
+- Event Calendar
+- Resume Upload & Skill Extraction
+- Volunteer Achievement System
+- Organization Insights
+- Cloud Deployment (Render/Vercel)
+- Progressive Web App (PWA)
 
 ---
