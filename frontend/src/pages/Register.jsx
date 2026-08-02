@@ -1,38 +1,63 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Eye, EyeOff } from 'lucide-react'
 import API from '../api'
 
 // ---------- Reusable Input (moved OUTSIDE Register so it isn't recreated on every keystroke) ----------
-const Input = ({ label, name, type = 'text', placeholder, value, onChange, error }) => (
-  <div>
-    <label className="text-sm font-medium text-gray-700 mb-1 block">{label}</label>
-    <input
-      type={type} 
-      name={name}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary transition
-        ${error ? 'border-red-400' : 'border-gray-300'}`}
-    />
-    {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
-  </div>
-)
+const Input = ({ label, name, type = 'text', placeholder, value, onChange, error }) => {
+  const isPassword = type === 'password'
+  const [showPassword, setShowPassword] = useState(false)
+
+  return (
+    <div>
+      <label className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1 block">{label}</label>
+      <div className="relative">
+        <input
+          type={isPassword ? (showPassword ? 'text' : 'password') : type}
+          name={name}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none transition
+            bg-white text-gray-900 placeholder-gray-400
+            dark:bg-slate-800 dark:text-white dark:placeholder-slate-500
+            focus:ring-2 focus:ring-primary
+            ${isPassword ? 'pr-11' : ''}
+            ${error ? 'border-red-400' : 'border-gray-300 dark:border-slate-700'}`}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={() => setShowPassword((prev) => !prev)}
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-slate-500 dark:hover:text-slate-300 transition"
+          >
+            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
+        )}
+      </div>
+      {error && <p className="text-red-500 dark:text-red-400 text-xs mt-1">{error}</p>}
+    </div>
+  )
+}
 
 const Select = ({ label, name, options, value, onChange, error }) => (
   <div>
-    <label className="text-sm font-medium text-gray-700 mb-1 block">{label}</label>
+    <label className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1 block">{label}</label>
     <select
       name={name}
       value={value}
       onChange={onChange}
-      className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary transition bg-white
-        ${error ? 'border-red-400' : 'border-gray-300'}`}
+      className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none transition
+        bg-white text-gray-900 dark:bg-slate-800 dark:text-white
+        focus:ring-2 focus:ring-primary
+        ${error ? 'border-red-400' : 'border-gray-300 dark:border-slate-700'}`}
     >
       <option value="">-- Select --</option>
       {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
-    {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+    {error && <p className="text-red-500 dark:text-red-400 text-xs mt-1">{error}</p>}
   </div>
 )
 
@@ -134,17 +159,17 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-[90vh] flex items-center justify-center bg-gray-50 px-4 py-10">
-      <div className="bg-white shadow-lg rounded-2xl p-8 w-full max-w-lg">
+    <div className="min-h-[90vh] flex items-center justify-center bg-gray-50 dark:bg-[#0B0F19] px-4 py-10 transition-colors duration-300">
+      <div className="bg-white dark:bg-[#151D2A] dark:border dark:border-slate-800 shadow-lg rounded-2xl p-8 w-full max-w-lg transition-colors duration-300">
 
         {/* Header */}
         <div className="text-center mb-6">
-          <h2 className="text-3xl font-bold text-gray-800">Create Account 🚀</h2>
-          <p className="text-gray-500 mt-1">Step {step} of 2</p>
+          <h2 className="text-3xl font-bold text-gray-800 dark:text-white">Create Account 🚀</h2>
+          <p className="text-gray-500 dark:text-slate-400 mt-1">Step {step} of 2</p>
         </div>
 
         {/* Progress Bar */}
-        <div className="w-full bg-gray-200 rounded-full h-2 mb-6">
+        <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2 mb-6">
           <div
             className="bg-primary h-2 rounded-full transition-all duration-300"
             style={{ width: step === 1 ? '50%' : '100%' }}
@@ -156,14 +181,14 @@ export default function Register() {
           <div className="flex flex-col gap-4">
 
             {/* Role Selector */}
-            <div className="flex rounded-xl overflow-hidden border border-gray-200 mb-2">
+            <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700 mb-2">
               {['volunteer', 'org'].map((r) => (
                 <button
                   key={r}
                   type="button"
                   onClick={() => { setRole(r); setErrors({}) }}
                   className={`flex-1 py-2 text-sm font-semibold capitalize transition
-                    ${role === r ? 'bg-primary text-white' : 'bg-white text-gray-500 hover:bg-gray-100'}`}
+                    ${role === r ? 'bg-primary text-white' : 'bg-white dark:bg-[#151D2A] text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'}`}
                 >
                   {r === 'org' ? 'Organization' : 'Volunteer'}
                 </button>
@@ -190,9 +215,9 @@ export default function Register() {
         {/* ---------- STEP 2 VOLUNTEER ---------- */}
         {step === 2 && role === 'volunteer' && (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <p className="text-sm text-gray-500 -mt-2 mb-1">Tell us about your skills so we can match you to the right events.</p>
+            <p className="text-sm text-gray-500 dark:text-slate-400 -mt-2 mb-1">Tell us about your skills so we can match you to the right events.</p>
             {serverError && (
-              <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl text-center">
+              <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-300 text-sm px-4 py-3 rounded-xl text-center">
                 {serverError}
               </div>
             )}
@@ -232,7 +257,7 @@ export default function Register() {
               <button
                 type="button"
                 onClick={handleBack}
-                className="flex-1 border border-gray-300 text-gray-600 py-3 rounded-xl font-semibold text-sm hover:bg-gray-100 transition"
+                className="flex-1 border border-gray-300 dark:border-slate-700 text-gray-600 dark:text-slate-300 py-3 rounded-xl font-semibold text-sm hover:bg-gray-100 dark:hover:bg-slate-800 transition"
               >
                 ← Back
               </button>
@@ -250,9 +275,9 @@ export default function Register() {
         {/* ---------- STEP 2 ORGANIZATION ---------- */}
         {step === 2 && role === 'org' && (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <p className="text-sm text-gray-500 -mt-2 mb-1">Tell us about your organization. An admin will review and verify your account before you can post events.</p>
+            <p className="text-sm text-gray-500 dark:text-slate-400 -mt-2 mb-1">Tell us about your organization. An admin will review and verify your account before you can post events.</p>
             {serverError && (
-              <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl text-center">
+              <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-300 text-sm px-4 py-3 rounded-xl text-center">
                 {serverError}
               </div>
             )}
@@ -291,24 +316,27 @@ export default function Register() {
             />
 
             <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">About Your Organization</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1 block">About Your Organization</label>
               <textarea
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
                 rows={3}
                 placeholder="Briefly describe what your organization does and what kind of volunteers you need..."
-                className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary transition resize-none
-                  ${errors.description ? 'border-red-400' : 'border-gray-300'}`}
+                className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none transition resize-none
+                  bg-white text-gray-900 placeholder-gray-400
+                  dark:bg-slate-800 dark:text-white dark:placeholder-slate-500
+                  focus:ring-2 focus:ring-primary
+                  ${errors.description ? 'border-red-400' : 'border-gray-300 dark:border-slate-700'}`}
               />
-              {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description}</p>}
+              {errors.description && <p className="text-red-500 dark:text-red-400 text-xs mt-1">{errors.description}</p>}
             </div>
 
             <div className="flex gap-3 mt-2">
               <button
                 type="button"
                 onClick={handleBack}
-                className="flex-1 border border-gray-300 text-gray-600 py-3 rounded-xl font-semibold text-sm hover:bg-gray-100 transition"
+                className="flex-1 border border-gray-300 dark:border-slate-700 text-gray-600 dark:text-slate-300 py-3 rounded-xl font-semibold text-sm hover:bg-gray-100 dark:hover:bg-slate-800 transition"
               >
                 ← Back
               </button>
@@ -324,9 +352,9 @@ export default function Register() {
         )}
 
         {/* Footer */}
-        <p className="text-center text-sm text-gray-500 mt-6">
+        <p className="text-center text-sm text-gray-500 dark:text-slate-400 mt-6">
           Already have an account?{' '}
-          <Link to="/login" className="text-primary font-semibold hover:underline">
+          <Link to="/login" className="text-primary dark:text-accent font-semibold hover:underline">
             Login here
           </Link>
         </p>

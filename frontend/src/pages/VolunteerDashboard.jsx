@@ -26,6 +26,10 @@ export default function VolunteerDashboard() {
   const [feedbackForm, setFeedbackForm] = useState({ comment: '', rating: 5 })
   const [feedbackLoading, setFeedbackLoading] = useState(false)
   const [feedbackResult, setFeedbackResult] = useState(null)
+  const [leaderboard, setLeaderboard] = useState([])
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false)
+  const [leaderboardSort, setLeaderboardSort] = useState('performanceScore')
+  const [myRank, setMyRank] = useState(null)
 
   useEffect(() => {
     fetchAll()
@@ -33,7 +37,12 @@ export default function VolunteerDashboard() {
     fetchPerformance()
     fetchSkillGap()
     fetchImpactStory()
+    fetchMyRank()
   }, [])
+
+  useEffect(() => {
+    fetchLeaderboard(leaderboardSort)
+  }, [leaderboardSort])
 
   const fetchAll = async () => {
     try {
@@ -101,6 +110,28 @@ export default function VolunteerDashboard() {
     }
   }
 
+  const fetchLeaderboard = async (sortBy) => {
+    try {
+      setLeaderboardLoading(true)
+      const res = await API.get(`/leaderboard?sortBy=${sortBy}`)
+      setLeaderboard(res.data.leaderboard || [])
+    } catch (err) {
+      console.error(err)
+      setLeaderboard([])
+    } finally {
+      setLeaderboardLoading(false)
+    }
+  }
+
+  const fetchMyRank = async () => {
+    try {
+      const res = await API.get('/leaderboard/my-rank')
+      setMyRank(res.data)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   const showNotification = (msg) => {
     setNotification(msg)
     setTimeout(() => setNotification(''), 3000)
@@ -141,7 +172,20 @@ export default function VolunteerDashboard() {
     return myEvents.some(e => e._id === eventId)
   }
 
-  const tabs = ['overview', 'events', 'my events', 'certificates', 'performance', 'edit profile']
+  const tabs = ['overview', 'events', 'my events', 'certificates', 'performance', 'leaderboard', 'edit profile']
+
+  const LEADERBOARD_SORT_OPTIONS = [
+    { key: 'performanceScore', label: 'Overall Score', unit: 'score', suffix: '/100' },
+    { key: 'hoursCompleted', label: 'Most Hours', unit: 'hours', suffix: '' },
+    { key: 'eventsAttended', label: 'Most Events', unit: 'events', suffix: '' },
+  ]
+
+  const RANK_MEDAL = { 1: '🥇', 2: '🥈', 3: '🥉' }
+  const RANK_STYLES = {
+    1: 'bg-yellow-50 border-yellow-300',
+    2: 'bg-gray-50 border-gray-300',
+    3: 'bg-orange-50 border-orange-300',
+  }
 
   if (loading) {
     return (
@@ -755,6 +799,113 @@ export default function VolunteerDashboard() {
 
   </div>
 )}
+
+        {/* ── LEADERBOARD TAB ── */}
+        {activeTab === 'leaderboard' && (
+          <div className="flex flex-col gap-6">
+
+            {myRank && (
+              <div className="bg-primary text-white rounded-2xl shadow p-6 flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <p className="text-sm text-blue-100">Your rank</p>
+                  <p className="text-3xl font-bold">
+                    #{myRank.rank}{' '}
+                    <span className="text-sm font-normal text-blue-100">
+                      of {myRank.totalVolunteers}
+                    </span>
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-blue-100">
+                    Top {100 - myRank.percentile <= 0 ? 1 : 100 - myRank.percentile}%
+                  </p>
+                  {myRank.pointsToNextRank > 0 ? (
+                    <p className="text-xs text-blue-100">
+                      {myRank.pointsToNextRank} points to climb a rank
+                    </p>
+                  ) : (
+                    <p className="text-xs text-blue-100">You're at the top! 🎉</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white rounded-2xl shadow p-6">
+              <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
+                <h3 className="font-bold text-gray-800">🏆 Volunteer Leaderboard</h3>
+                <div className="flex gap-2 flex-wrap">
+                  {LEADERBOARD_SORT_OPTIONS.map(opt => (
+                    <button
+                      key={opt.key}
+                      onClick={() => setLeaderboardSort(opt.key)}
+                      className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${
+                        leaderboardSort === opt.key
+                          ? 'bg-primary text-white'
+                          : 'bg-gray-50 text-gray-600 border border-gray-200 hover:border-primary'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {leaderboardLoading ? (
+                <p className="text-center text-gray-400 py-10">Loading leaderboard...</p>
+              ) : leaderboard.length === 0 ? (
+                <p className="text-center text-gray-400 py-10">No volunteers to rank yet — be the first!</p>
+              ) : (
+                <div className="space-y-2">
+                  {leaderboard.map(v => {
+                    const activeOption = LEADERBOARD_SORT_OPTIONS.find(
+                      opt => opt.key === leaderboardSort
+                    )
+                    const value =
+                      leaderboardSort === 'hoursCompleted'
+                        ? v.hoursCompleted
+                        : leaderboardSort === 'eventsAttended'
+                        ? v.eventsAttended
+                        : v.performanceScore
+                    const isMe = profile?._id && v._id === profile._id
+
+                    return (
+                      <div
+                        key={v._id}
+                        className={`flex items-center gap-4 p-4 rounded-xl border ${
+                          RANK_STYLES[v.rank] || 'bg-white border-gray-200'
+                        } ${isMe ? 'ring-2 ring-primary' : ''}`}
+                      >
+                        <div className="w-10 text-center font-bold text-gray-500 text-lg">
+                          {RANK_MEDAL[v.rank] || `#${v.rank}`}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-800 truncate">
+                            {v.name} {isMe && <span className="text-xs text-primary font-normal">(you)</span>}
+                          </p>
+                          <p className="text-xs text-gray-400">{v.location}</p>
+                        </div>
+                        {v.badge && (
+                          <span className="text-xs font-semibold text-primary bg-blue-50 px-2.5 py-1 rounded-full whitespace-nowrap">
+                            {v.badge}
+                          </span>
+                        )}
+                        <div className="text-right w-24 shrink-0">
+                          <p className="font-bold text-gray-800">
+                            {value}
+                            {activeOption?.suffix && (
+                              <span className="text-xs text-gray-400">{activeOption.suffix}</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-400">{activeOption?.unit}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── EDIT PROFILE TAB ── */}
         {activeTab === 'edit profile' && (

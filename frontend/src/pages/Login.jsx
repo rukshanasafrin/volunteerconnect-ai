@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Eye, EyeOff } from 'lucide-react'
 import API from '../api'
 import { useAuth } from '../context/AuthContext'
 
@@ -10,6 +11,7 @@ export default function Login() {
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [serverError, setServerError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   const validate = () => {
     const newErrors = {}
@@ -106,18 +108,29 @@ export default function Login() {
 
           <div>
             <label className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1 block">Password</label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="••••••••"
-              className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none transition
-                bg-white text-gray-900 placeholder-gray-400
-                dark:bg-slate-800 dark:text-white dark:placeholder-slate-500
-                focus:ring-2 focus:ring-primary
-                ${errors.password ? 'border-red-400' : 'border-gray-300 dark:border-slate-700'}`}
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="••••••••"
+                className={`w-full border rounded-xl px-4 py-2.5 pr-11 text-sm outline-none transition
+                  bg-white text-gray-900 placeholder-gray-400
+                  dark:bg-slate-800 dark:text-white dark:placeholder-slate-500
+                  focus:ring-2 focus:ring-primary
+                  ${errors.password ? 'border-red-400' : 'border-gray-300 dark:border-slate-700'}`}
+              />
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-slate-500 dark:hover:text-slate-300 transition"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
             {errors.password && <p className="text-red-500 dark:text-red-400 text-xs mt-1">{errors.password}</p>}
           </div>
 
