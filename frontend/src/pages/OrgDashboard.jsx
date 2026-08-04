@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import EditOrgProfileForm from '../components/EditOrgProfileForm'
 import API from '../api'
+import socket from '../socket'
 
 
 // ✅ OUTSIDE component — fixes typing bug
 const FormInput = ({ label, name, value, onChange, error, type = 'text', placeholder }) => (
   <div>
-    <label className="text-sm font-medium text-gray-700 mb-1 block">{label}</label>
+    <label className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1 block">{label}</label>
     <input
       type={type}
       name={name}
@@ -16,7 +17,7 @@ const FormInput = ({ label, name, value, onChange, error, type = 'text', placeho
       onChange={onChange}
       placeholder={placeholder}
       className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-secondary transition
-        ${error ? 'border-red-400' : 'border-gray-300'}`}
+        ${error ? 'border-red-400' : 'border-gray-300 dark:border-slate-700'}`}
     />
     {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
   </div>
@@ -46,6 +47,35 @@ export default function OrgDashboard() {
   const [creating, setCreating] = useState(false)
 
   useEffect(() => { fetchAll() }, [])
+
+  // Live updates: registration counts and open/closed status update the
+  // moment a volunteer registers, without needing to refresh the page.
+  useEffect(() => {
+    const isOwnEvent = (organizationId) => String(organizationId) === String(user?.id)
+
+    const handleNewEvent = (event) => {
+      if (!isOwnEvent(event.organization)) return
+      setEvents((prev) => (prev.some(e => e._id === event._id) ? prev : [event, ...prev]))
+    }
+
+    const handleEventUpdated = (patch) => {
+      setEvents((prev) => prev.map(e => (e._id === patch._id ? { ...e, ...patch } : e)))
+    }
+
+    const handleEventDeleted = ({ _id }) => {
+      setEvents((prev) => prev.filter(e => e._id !== _id))
+    }
+
+    socket.on('event:new', handleNewEvent)
+    socket.on('event:updated', handleEventUpdated)
+    socket.on('event:deleted', handleEventDeleted)
+
+    return () => {
+      socket.off('event:new', handleNewEvent)
+      socket.off('event:updated', handleEventUpdated)
+      socket.off('event:deleted', handleEventDeleted)
+    }
+  }, [user?.id])
 
   const fetchAll = async () => {
     try {
@@ -180,34 +210,66 @@ export default function OrgDashboard() {
 
   const handleLogout = () => { logout(); navigate('/') }
 
+  const EVENT_CATEGORY_META = [
+    { key: 'environment', label: 'Environment', emoji: '🌱', badge: 'bg-emerald-100 text-emerald-700' },
+    { key: 'education', label: 'Education', emoji: '🎓', badge: 'bg-blue-100 text-blue-700' },
+    { key: 'health', label: 'Health', emoji: '🏥', badge: 'bg-rose-100 text-rose-700' },
+    { key: 'community', label: 'Community', emoji: '🤝', badge: 'bg-amber-100 text-amber-700' },
+    { key: 'disaster relief', label: 'Disaster Relief', emoji: '🚨', badge: 'bg-orange-100 text-orange-700' },
+    { key: 'animal welfare', label: 'Animal Welfare', emoji: '🐾', badge: 'bg-purple-100 text-purple-700' },
+    { key: 'other', label: 'Other', emoji: '✨', badge: 'bg-gray-100 text-gray-700 dark:text-slate-300' },
+  ]
+
+  const getCategoryMeta = (key) =>
+    EVENT_CATEGORY_META.find(c => c.key === key) || EVENT_CATEGORY_META[EVENT_CATEGORY_META.length - 1]
+
+  const getEventOpenStatus = (event) => {
+    const capacity = Number(event.volunteersNeeded) || 0
+    const registeredCount = event.registeredVolunteers?.length || 0
+    const lifecycleClosed = Boolean(event.status) && event.status !== 'upcoming'
+    return !lifecycleClosed && registeredCount < capacity
+  }
+
+  const groupEventsByCategory = (list) => {
+    const groups = new Map()
+    list.forEach(event => {
+      const key = EVENT_CATEGORY_META.some(c => c.key === event.category) ? event.category : 'other'
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key).push(event)
+    })
+    return EVENT_CATEGORY_META
+      .map(meta => ({ meta, events: groups.get(meta.key) || [] }))
+      .filter(group => group.events.length > 0)
+  }
+
   const totalVolunteers = events.reduce((acc, e) => acc + (e.registeredVolunteers?.length || 0), 0)
   const tabs = ['overview', 'events', 'volunteers', 'edit profile']
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0B0F19] transition-colors duration-300">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-secondary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-500 font-medium">Loading dashboard...</p>
+          <p className="text-gray-500 dark:text-slate-400 font-medium">Loading dashboard...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0B0F19] transition-colors duration-300">
 
       {/* Top Bar */}
-      <div className="bg-white shadow-sm px-8 py-4 flex justify-between items-center">
+      <div className="bg-white shadow-sm dark:bg-[#151D2A] dark:shadow-none dark:border-b dark:border-slate-800 px-8 py-4 flex justify-between items-center">
         <h1 className="text-xl font-bold text-primary">🤝 VolunteerConnect</h1>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">👋 {profile?.orgName}</span>
+          <span className="text-sm text-gray-600 dark:text-slate-300">👋 {profile?.orgName}</span>
           <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-semibold capitalize">
             {profile?.orgType}
           </span>
           <button
             onClick={handleLogout}
-            className="text-sm bg-red-50 text-red-500 px-4 py-2 rounded-lg hover:bg-red-100 transition"
+            className="text-sm bg-red-50 dark:bg-red-500/10 text-red-500 px-4 py-2 rounded-lg hover:bg-red-100 transition"
           >
             Logout
           </button>
@@ -224,16 +286,16 @@ export default function OrgDashboard() {
       <div className="max-w-6xl mx-auto px-6 py-8">
 
         {/* Profile Card */}
-        <div className="bg-white rounded-2xl shadow p-6 mb-6">
+        <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6 mb-6">
           <div className="flex flex-col md:flex-row justify-between items-start gap-4">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <h2 className="text-2xl font-bold text-gray-800">{profile?.orgName}</h2>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{profile?.orgName}</h2>
                 <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-semibold">
                   ✅ Verified
                 </span>
               </div>
-              <p className="text-gray-500 text-sm">
+              <p className="text-gray-500 dark:text-slate-400 text-sm">
                 📧 {profile?.email} &nbsp;|&nbsp;
                 📍 {profile?.location} &nbsp;|&nbsp;
                 📞 {profile?.phone}
@@ -248,7 +310,7 @@ export default function OrgDashboard() {
                   🌐 {profile.website}
                 </a>
               )} 
-              <p className="text-gray-600 text-sm mt-2 max-w-2xl">{profile?.description}</p>
+              <p className="text-gray-600 dark:text-slate-300 text-sm mt-2 max-w-2xl">{profile?.description}</p>
             </div>
             <button
               onClick={() => { setShowCreateForm(true); setActiveTab('events') }}
@@ -266,16 +328,16 @@ export default function OrgDashboard() {
             { label: 'Total Volunteers', value: totalVolunteers, icon: '👥' },
             { label: 'Completed Events', value: events.filter(e => e.status === 'completed').length, icon: '✅' },
           ].map(stat => (
-            <div key={stat.label} className="bg-white rounded-2xl shadow p-4 text-center">
+            <div key={stat.label} className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-4 text-center">
               <div className="text-3xl mb-1">{stat.icon}</div>
-              <div className="text-2xl font-bold text-gray-800">{stat.value}</div>
-              <div className="text-xs text-gray-500 mt-1">{stat.label}</div>
+              <div className="text-2xl font-bold text-gray-800 dark:text-white">{stat.value}</div>
+              <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">{stat.label}</div>
             </div>
           ))}
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-gray-200 overflow-x-auto">
+        <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-slate-700 overflow-x-auto">
           {tabs.map(tab => (
             <button
               key={tab}
@@ -283,7 +345,7 @@ export default function OrgDashboard() {
               className={`px-4 py-2 text-sm font-semibold capitalize transition border-b-2 -mb-px whitespace-nowrap
                 ${activeTab === tab
                   ? 'border-secondary text-secondary'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                  : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:text-slate-300'}`}
             >
               {tab}
             </button>
@@ -293,8 +355,8 @@ export default function OrgDashboard() {
         {/* ── OVERVIEW TAB ── */}
         {activeTab === 'overview' && (
           <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-white rounded-2xl shadow p-6">
-              <h3 className="font-bold text-gray-800 mb-4">🏢 Organization Details</h3>
+            <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6">
+              <h3 className="font-bold text-gray-800 dark:text-white mb-4">🏢 Organization Details</h3>
               <div className="flex flex-col gap-3 text-sm">
                 {[
                   { label: 'Contact Person', value: profile?.name },
@@ -305,19 +367,19 @@ export default function OrgDashboard() {
                   { label: 'Status', value: '✅ Verified' },
                 ].map(item => (
                   <div key={item.label} className="flex justify-between border-b pb-2">
-                    <span className="text-gray-500">{item.label}</span>
-                    <span className="font-medium text-gray-800 capitalize">{item.value}</span>
+                    <span className="text-gray-500 dark:text-slate-400">{item.label}</span>
+                    <span className="font-medium text-gray-800 dark:text-white capitalize">{item.value}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow p-6">
-              <h3 className="font-bold text-gray-800 mb-4">📅 Recent Events</h3>
+            <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6">
+              <h3 className="font-bold text-gray-800 dark:text-white mb-4">📅 Recent Events</h3>
               {events.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-3xl mb-2">📋</p>
-                  <p className="text-gray-400 text-sm">No events created yet</p>
+                  <p className="text-gray-400 dark:text-slate-500 text-sm">No events created yet</p>
                   <button
                     onClick={() => { setShowCreateForm(true); setActiveTab('events') }}
                     className="mt-3 text-secondary text-sm font-semibold hover:underline"
@@ -330,8 +392,8 @@ export default function OrgDashboard() {
                   {events.slice(0, 3).map(event => (
                     <div key={event._id} className="flex justify-between items-center border-b pb-2">
                       <div>
-                        <p className="text-sm font-semibold text-gray-800">{event.title}</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-sm font-semibold text-gray-800 dark:text-white">{event.title}</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400">
                           {new Date(event.date).toLocaleDateString()} · {event.registeredVolunteers?.length} volunteers
                         </p>
                       </div>
@@ -355,12 +417,12 @@ export default function OrgDashboard() {
 
             {/* Create Event Form */}
             {showCreateForm && (
-              <div className="bg-white rounded-2xl shadow p-6 border-l-4 border-secondary">
+              <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6 border-l-4 border-secondary">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold text-gray-800">📋 Create New Event</h3>
+                  <h3 className="font-bold text-gray-800 dark:text-white">📋 Create New Event</h3>
                   <button
                     onClick={() => setShowCreateForm(false)}
-                    className="text-gray-400 hover:text-gray-600 text-xl font-bold"
+                    className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:text-slate-300 text-xl font-bold"
                   >
                     ✕
                   </button>
@@ -378,7 +440,7 @@ export default function OrgDashboard() {
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="text-sm font-medium text-gray-700 mb-1 block">Description</label>
+                    <label className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1 block">Description</label>
                     <textarea
                       name="description"
                       value={formData.description}
@@ -386,7 +448,7 @@ export default function OrgDashboard() {
                       rows={3}
                       placeholder="Describe the event and what volunteers will do..."
                       className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-secondary transition resize-none
-                        ${formErrors.description ? 'border-red-400' : 'border-gray-300'}`}
+                        ${formErrors.description ? 'border-red-400' : 'border-gray-300 dark:border-slate-700'}`}
                     />
                     {formErrors.description && (
                       <p className="text-red-500 text-xs mt-1">{formErrors.description}</p>
@@ -394,13 +456,15 @@ export default function OrgDashboard() {
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-gray-700 mb-1 block">Category</label>
+                    <label className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1 block">Category</label>
                     <select
                       name="category"
                       value={formData.category}
                       onChange={handleChange}
-                      className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-secondary transition bg-white
-                        ${formErrors.category ? 'border-red-400' : 'border-gray-300'}`}
+                      className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none transition
+                        bg-white text-gray-900 dark:bg-slate-800 dark:text-white
+                        focus:ring-2 focus:ring-secondary
+                        ${formErrors.category ? 'border-red-400' : 'border-gray-300 dark:border-slate-700'}`}
                     >
                       <option value="">-- Select Category --</option>
                       {['education', 'environment', 'health', 'community', 'disaster relief', 'animal welfare', 'other'].map(c => (
@@ -458,7 +522,7 @@ export default function OrgDashboard() {
                     <button
                       type="button"
                       onClick={() => setShowCreateForm(false)}
-                      className="flex-1 border border-gray-300 text-gray-600 py-3 rounded-xl font-semibold text-sm hover:bg-gray-100 transition"
+                      className="flex-1 border border-gray-300 dark:border-slate-700 text-gray-600 dark:text-slate-300 py-3 rounded-xl font-semibold text-sm hover:bg-gray-100 transition"
                     >
                       Cancel
                     </button>
@@ -476,7 +540,7 @@ export default function OrgDashboard() {
 
             {/* Events List Header */}
             <div className="flex justify-between items-center">
-              <h3 className="font-bold text-gray-700">Your Events ({events.length})</h3>
+              <h3 className="font-bold text-gray-700 dark:text-slate-300">Your Events ({events.length})</h3>
               {!showCreateForm && (
                 <button
                   onClick={() => setShowCreateForm(true)}
@@ -488,10 +552,10 @@ export default function OrgDashboard() {
             </div>
 
             {events.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl shadow">
+              <div className="text-center py-16 bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none">
                 <p className="text-5xl mb-4">📅</p>
-                <h3 className="text-lg font-bold text-gray-700">No Events Created Yet</h3>
-                <p className="text-gray-400 text-sm mt-2 mb-4">
+                <h3 className="text-lg font-bold text-gray-700 dark:text-slate-300">No Events Created Yet</h3>
+                <p className="text-gray-400 dark:text-slate-500 text-sm mt-2 mb-4">
                   Create your first event to start finding volunteers.
                 </p>
                 <button
@@ -502,16 +566,29 @@ export default function OrgDashboard() {
                 </button>
               </div>
             ) : (
-              events.map(event => (
-                <div key={event._id} className="bg-white rounded-2xl shadow p-6">
+              groupEventsByCategory(events).map(({ meta, events: categoryEvents }) => (
+                <div key={meta.key} className="flex flex-col gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{meta.emoji}</span>
+                    <h4 className="font-bold text-gray-800 dark:text-white">{meta.label}</h4>
+                    <span className="text-xs text-gray-400 dark:text-slate-500 font-semibold">
+                      {categoryEvents.length} {categoryEvents.length === 1 ? 'event' : 'events'}
+                    </span>
+                  </div>
+
+                  {categoryEvents.map(event => {
+                    const isOpen = getEventOpenStatus(event)
+
+                    return (
+                <div key={event._id} className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6">
 
                   {/* Event Header */}
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h4 className="font-bold text-gray-800">{event.title}</h4>
-                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full capitalize">
-                          {event.category}
+                        <h4 className="font-bold text-gray-800 dark:text-white">{event.title}</h4>
+                        <span className={`text-xs px-2 py-0.5 rounded-full capitalize font-semibold ${meta.badge}`}>
+                          {meta.emoji} {meta.label}
                         </span>
                         <span className={`text-xs px-2 py-0.5 rounded-full capitalize font-medium
                           ${event.status === 'completed'
@@ -519,9 +596,13 @@ export default function OrgDashboard() {
                             : 'bg-yellow-100 text-yellow-700'}`}>
                           {event.status}
                         </span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold
+                          ${isOpen ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500 dark:text-slate-400'}`}>
+                          {isOpen ? '🟢 Open' : '🔒 Closed'}
+                        </span>
                       </div>
-                      <p className="text-sm text-gray-500 mt-1">{event.description}</p>
-                      <div className="flex flex-wrap gap-4 mt-2 text-xs text-gray-500">
+                      <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">{event.description}</p>
+                      <div className="flex flex-wrap gap-4 mt-2 text-xs text-gray-500 dark:text-slate-400">
                         <span>📅 {new Date(event.date).toLocaleDateString()}</span>
                         <span>📍 {event.location}</span>
                         <span>⏱️ {event.duration}</span>
@@ -532,14 +613,14 @@ export default function OrgDashboard() {
                       {event.status === 'upcoming' && (
                         <button
                           onClick={() => handleMarkComplete(event._id)}
-                          className="text-xs bg-green-50 text-green-600 px-3 py-1.5 rounded-lg hover:bg-green-100 transition font-semibold"
+                          className="text-xs bg-green-50 dark:bg-green-500/10 text-green-600 px-3 py-1.5 rounded-lg hover:bg-green-100 transition font-semibold"
                         >
                           ✅ Complete
                         </button>
                       )}
                       <button
                         onClick={() => handleDeleteEvent(event._id)}
-                        className="text-xs bg-red-50 text-red-500 px-3 py-1.5 rounded-lg hover:bg-red-100 transition font-semibold"
+                        className="text-xs bg-red-50 dark:bg-red-500/10 text-red-500 px-3 py-1.5 rounded-lg hover:bg-red-100 transition font-semibold"
                       >
                         🗑️ Delete
                       </button>
@@ -548,16 +629,16 @@ export default function OrgDashboard() {
 
                   {/* Registered Volunteers */}
                   {event.registeredVolunteers?.length > 0 && (
-                    <div className="mt-4 border-t pt-4">
-                      <p className="text-sm font-semibold text-gray-700 mb-3">
+                    <div className="mt-4 border-t dark:border-slate-700 pt-4">
+                      <p className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-3">
                         Registered Volunteers ({event.registeredVolunteers.length}):
                       </p>
                       <div className="flex flex-col gap-2">
                         {event.registeredVolunteers.map(vol => (
-                          <div key={vol._id} className="flex justify-between items-center bg-gray-50 rounded-xl px-4 py-2">
+                          <div key={vol._id} className="flex justify-between items-center bg-gray-50 dark:bg-slate-800/60 rounded-xl px-4 py-2">
                             <div>
-                              <p className="text-sm font-medium text-gray-800">{vol.name}</p>
-                              <p className="text-xs text-gray-500">{vol.email} · {vol.skills?.join(', ')}</p>
+                              <p className="text-sm font-medium text-gray-800 dark:text-white">{vol.name}</p>
+                              <p className="text-xs text-gray-500 dark:text-slate-400">{vol.email} · {vol.skills?.join(', ')}</p>
                             </div>
                             <div className="flex items-center gap-2">
                               <span className={`text-xs px-2 py-1 rounded-full font-medium capitalize
@@ -570,13 +651,13 @@ export default function OrgDashboard() {
                                 <div className="flex gap-1">
                                   <button
                                     onClick={() => handleVolunteerStatus(event._id, vol.volunteer, 'approved')}
-                                    className="text-xs bg-green-500 text-white px-2 py-1 rounded-lg hover:bg-green-600 transition"
+                                    className="text-xs bg-green-50 dark:bg-green-500/100 text-white px-2 py-1 rounded-lg hover:bg-green-600 transition"
                                   >
                                     Approve
                                   </button>
                                   <button
                                     onClick={() => handleVolunteerStatus(event._id, vol.volunteer, 'rejected')}
-                                    className="text-xs bg-red-400 text-white px-2 py-1 rounded-lg hover:bg-red-500 transition"
+                                    className="text-xs bg-red-400 text-white px-2 py-1 rounded-lg hover:bg-red-50 dark:bg-red-500/100 transition"
                                   >
                                     Reject
                                   </button>
@@ -590,13 +671,13 @@ export default function OrgDashboard() {
                   )}
 
                   {/* AI Volunteer Recommendations */}
-                  <div className="mt-4 border-t pt-4">
+                  <div className="mt-4 border-t dark:border-slate-700 pt-4">
                     <div className="flex justify-between items-center mb-3">
-                      <p className="text-sm font-semibold text-gray-700">🤖 AI Recommended Volunteers</p>
+                      <p className="text-sm font-semibold text-gray-700 dark:text-slate-300">🤖 AI Recommended Volunteers</p>
                       <button
                         onClick={() => fetchAiRecommendations(event._id)}
                         disabled={aiLoadingId === event._id}
-                        className="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition font-semibold disabled:opacity-60"
+                        className="text-xs bg-blue-50 dark:bg-blue-500/10 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition font-semibold disabled:opacity-60"
                       >
                         {aiLoadingId === event._id ? 'Analyzing...' : 'Find Matches'}
                       </button>
@@ -604,30 +685,30 @@ export default function OrgDashboard() {
                     {aiRecommendations[event._id] && (
                       <div className="flex flex-col gap-2">
                         {aiRecommendations[event._id].length === 0 ? (
-                          <p className="text-xs text-gray-400 text-center py-3">
+                          <p className="text-xs text-gray-400 dark:text-slate-500 text-center py-3">
                             No matching volunteers found
                           </p>
                         ) : (
                           aiRecommendations[event._id].slice(0, 5).map(rec => (
-                            <div key={rec.volunteer._id} className="flex justify-between items-center bg-blue-50 rounded-xl px-4 py-3">
+                            <div key={rec.volunteer._id} className="flex justify-between items-center bg-blue-50 dark:bg-blue-500/10 rounded-xl px-4 py-3">
                               <div className="flex-1">
-                                <p className="text-sm font-semibold text-gray-800">{rec.volunteer.name}</p>
-                                <p className="text-xs text-gray-500">
+                                <p className="text-sm font-semibold text-gray-800 dark:text-white">{rec.volunteer.name}</p>
+                                <p className="text-xs text-gray-500 dark:text-slate-400">
                                   📍 {rec.volunteer.location} · {rec.volunteer.skills?.slice(0, 2).join(', ')}
                                 </p>
                                 <div className="flex gap-3 mt-1">
-                                  <span className="text-xs text-gray-400">Skills: {rec.breakdown.skills}%</span>
-                                  <span className="text-xs text-gray-400">Location: {rec.breakdown.location}%</span>
-                                  <span className="text-xs text-gray-400">Availability: {rec.breakdown.availability}%</span>
+                                  <span className="text-xs text-gray-400 dark:text-slate-500">Skills: {rec.breakdown.skills}%</span>
+                                  <span className="text-xs text-gray-400 dark:text-slate-500">Location: {rec.breakdown.location}%</span>
+                                  <span className="text-xs text-gray-400 dark:text-slate-500">Availability: {rec.breakdown.availability}%</span>
                                 </div>
                               </div>
                               <div className="text-center ml-3">
                                 <div className={`text-xl font-black
                                   ${rec.matchScore >= 70 ? 'text-green-600' :
-                                    rec.matchScore >= 40 ? 'text-yellow-600' : 'text-gray-500'}`}>
+                                    rec.matchScore >= 40 ? 'text-yellow-600' : 'text-gray-500 dark:text-slate-400'}`}>
                                   {rec.matchScore}%
                                 </div>
-                                <div className="text-xs text-gray-400">match</div>
+                                <div className="text-xs text-gray-400 dark:text-slate-500">match</div>
                               </div>
                             </div>
                           ))
@@ -637,13 +718,13 @@ export default function OrgDashboard() {
                   </div>
 
                   {/* AI Dream Team Builder */}
-                  <div className="mt-4 border-t pt-4">
+                  <div className="mt-4 border-t dark:border-slate-700 pt-4">
                     <div className="flex justify-between items-center mb-3">
-                      <p className="text-sm font-semibold text-gray-700">🧩 AI Dream Team Builder</p>
+                      <p className="text-sm font-semibold text-gray-700 dark:text-slate-300">🧩 AI Dream Team Builder</p>
                       <button
                         onClick={() => fetchDreamTeam(event._id)}
                         disabled={dreamTeamLoadingId === event._id}
-                        className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition font-semibold disabled:opacity-60"
+                        className="text-xs bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition font-semibold disabled:opacity-60"
                       >
                         {dreamTeamLoadingId === event._id ? 'Building...' : 'Build Dream Team'}
                       </button>
@@ -651,49 +732,49 @@ export default function OrgDashboard() {
                     {dreamTeamData[event._id] && (
                       <div className="flex flex-col gap-3">
                         {dreamTeamData[event._id].team.length === 0 ? (
-                          <p className="text-xs text-gray-400 text-center py-3">
+                          <p className="text-xs text-gray-400 dark:text-slate-500 text-center py-3">
                             No suitable candidates found to build a team yet
                           </p>
                         ) : (
                           <>
                             <div className="flex flex-wrap gap-2">
-                              <span className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded-lg font-medium">
+                              <span className="text-xs bg-green-50 dark:bg-green-500/10 text-green-700 px-2 py-1 rounded-lg font-medium">
                                 ✅ Covers {dreamTeamData[event._id].skillsCovered.length}/
                                 {(dreamTeamData[event._id].skillsCovered.length + dreamTeamData[event._id].skillsMissing.length)} required skills
                               </span>
                               {dreamTeamData[event._id].skillsMissing.length > 0 && (
-                                <span className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded-lg font-medium">
+                                <span className="text-xs bg-red-50 dark:bg-red-500/10 text-red-600 px-2 py-1 rounded-lg font-medium">
                                   ⚠️ Missing: {dreamTeamData[event._id].skillsMissing.join(', ')}
                                 </span>
                               )}
-                              <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg font-medium">
+                              <span className="text-xs bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 px-2 py-1 rounded-lg font-medium">
                                 📍 {dreamTeamData[event._id].locationSpread} location(s)
                               </span>
-                              <span className="text-xs bg-yellow-50 text-yellow-700 px-2 py-1 rounded-lg font-medium">
+                              <span className="text-xs bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 px-2 py-1 rounded-lg font-medium">
                                 ⭐ Avg match {dreamTeamData[event._id].avgMatchScore}%
                               </span>
                             </div>
 
                             <div className="flex flex-col gap-2">
                               {dreamTeamData[event._id].team.map(member => (
-                                <div key={member.volunteer._id} className="flex justify-between items-center bg-indigo-50 rounded-xl px-4 py-3">
+                                <div key={member.volunteer._id} className="flex justify-between items-center bg-indigo-50 dark:bg-indigo-500/10 rounded-xl px-4 py-3">
                                   <div className="flex-1">
-                                    <p className="text-sm font-semibold text-gray-800">{member.volunteer.name}</p>
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-sm font-semibold text-gray-800 dark:text-white">{member.volunteer.name}</p>
+                                    <p className="text-xs text-gray-500 dark:text-slate-400">
                                       📍 {member.volunteer.location} · brings: {member.contributesSkills.length > 0 ? member.contributesSkills.join(', ') : 'general support'}
                                     </p>
                                   </div>
                                   <div className="text-center ml-3">
                                     <div className="text-lg font-black text-indigo-600">{member.matchScore}%</div>
-                                    <div className="text-xs text-gray-400">match</div>
+                                    <div className="text-xs text-gray-400 dark:text-slate-500">match</div>
                                   </div>
                                 </div>
                               ))}
                             </div>
 
-                            <div className="bg-gray-50 rounded-xl px-4 py-3">
-                              <p className="text-xs font-semibold text-gray-600 mb-1">🤖 Why this team works</p>
-                              <p className="text-xs text-gray-600 leading-relaxed">{dreamTeamData[event._id].explanation}</p>
+                            <div className="bg-gray-50 dark:bg-slate-800/60 rounded-xl px-4 py-3">
+                              <p className="text-xs font-semibold text-gray-600 dark:text-slate-300 mb-1">🤖 Why this team works</p>
+                              <p className="text-xs text-gray-600 dark:text-slate-300 leading-relaxed">{dreamTeamData[event._id].explanation}</p>
                             </div>
                           </>
                         )}
@@ -702,13 +783,13 @@ export default function OrgDashboard() {
                   </div>
 
                   {/* Sentiment Analysis */}
-                  <div className="mt-4 border-t pt-4">
+                  <div className="mt-4 border-t dark:border-slate-700 pt-4">
                     <div className="flex justify-between items-center mb-3">
-                      <p className="text-sm font-semibold text-gray-700">📊 Feedback Sentiment</p>
+                      <p className="text-sm font-semibold text-gray-700 dark:text-slate-300">📊 Feedback Sentiment</p>
                       <button
                         onClick={() => fetchSentiment(event._id)}
                         disabled={sentimentLoadingId === event._id}
-                        className="text-xs bg-purple-50 text-purple-600 px-3 py-1.5 rounded-lg hover:bg-purple-100 transition font-semibold disabled:opacity-60"
+                        className="text-xs bg-purple-50 dark:bg-purple-500/10 text-purple-600 px-3 py-1.5 rounded-lg hover:bg-purple-100 transition font-semibold disabled:opacity-60"
                       >
                         {sentimentLoadingId === event._id ? 'Loading...' : 'View Sentiment'}
                       </button>
@@ -716,17 +797,17 @@ export default function OrgDashboard() {
                     {sentimentData[event._id] && (
                       <div>
                         {sentimentData[event._id].totalFeedbacks === 0 ? (
-                          <p className="text-xs text-gray-400 text-center py-3">
+                          <p className="text-xs text-gray-400 dark:text-slate-500 text-center py-3">
                             No feedback submitted yet
                           </p>
                         ) : (
                           <div className="flex flex-col gap-3">
-                            <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+                            <div className="flex items-center justify-between bg-gray-50 dark:bg-slate-800/60 rounded-xl px-4 py-3">
                               <div>
-                                <p className="text-sm font-semibold text-gray-800">
+                                <p className="text-sm font-semibold text-gray-800 dark:text-white">
                                   Overall: {sentimentData[event._id].overallSentiment}
                                 </p>
-                                <p className="text-xs text-gray-500">
+                                <p className="text-xs text-gray-500 dark:text-slate-400">
                                   {sentimentData[event._id].totalFeedbacks} feedbacks · Avg rating: {sentimentData[event._id].avgRating}/5
                                 </p>
                               </div>
@@ -738,23 +819,23 @@ export default function OrgDashboard() {
 
                             <div className="grid grid-cols-3 gap-2">
                               {[
-                                { label: 'Positive', value: sentimentData[event._id].breakdown.positive, text: 'text-green-700', bg: 'bg-green-50' },
-                                { label: 'Neutral', value: sentimentData[event._id].breakdown.neutral, text: 'text-yellow-700', bg: 'bg-yellow-50' },
-                                { label: 'Negative', value: sentimentData[event._id].breakdown.negative, text: 'text-red-700', bg: 'bg-red-50' },
+                                { label: 'Positive', value: sentimentData[event._id].breakdown.positive, text: 'text-green-700', bg: 'bg-green-50 dark:bg-green-500/10' },
+                                { label: 'Neutral', value: sentimentData[event._id].breakdown.neutral, text: 'text-yellow-700', bg: 'bg-yellow-50 dark:bg-yellow-500/10' },
+                                { label: 'Negative', value: sentimentData[event._id].breakdown.negative, text: 'text-red-700', bg: 'bg-red-50 dark:bg-red-500/10' },
                               ].map(s => (
                                 <div key={s.label} className={`${s.bg} rounded-xl p-3 text-center`}>
                                   <div className={`text-lg font-bold ${s.text}`}>{s.value}</div>
-                                  <div className="text-xs text-gray-500">{s.label}</div>
+                                  <div className="text-xs text-gray-500 dark:text-slate-400">{s.label}</div>
                                 </div>
                               ))}
                             </div>
 
                             {sentimentData[event._id].topKeywords?.length > 0 && (
                               <div>
-                                <p className="text-xs text-gray-500 mb-2">Top Keywords:</p>
+                                <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">Top Keywords:</p>
                                 <div className="flex flex-wrap gap-2">
                                   {sentimentData[event._id].topKeywords.map(k => (
-                                    <span key={k.word} className="bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-full">
+                                    <span key={k.word} className="bg-blue-50 dark:bg-blue-500/10 text-blue-700 text-xs px-2 py-1 rounded-full">
                                       {k.word} ({k.count})
                                     </span>
                                   ))}
@@ -764,7 +845,7 @@ export default function OrgDashboard() {
 
                             <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
                               {sentimentData[event._id].feedbacks?.map((f, i) => (
-                                <div key={i} className="bg-white border border-gray-100 rounded-xl p-3">
+                                <div key={i} className="bg-white border border-gray-100 dark:border-slate-800 rounded-xl p-3">
                                   <div className="flex justify-between items-start mb-1">
                                     <div className="flex gap-0.5">
                                       {[...Array(5)].map((_, s) => (
@@ -778,7 +859,7 @@ export default function OrgDashboard() {
                                       {f.sentiment}
                                     </span>
                                   </div>
-                                  <p className="text-xs text-gray-600">"{f.comment}"</p>
+                                  <p className="text-xs text-gray-600 dark:text-slate-300">"{f.comment}"</p>
                                 </div>
                               ))}
                             </div>
@@ -789,6 +870,10 @@ export default function OrgDashboard() {
                   </div>
 
                 </div>
+
+                    )
+                  })}
+                </div>
               ))
             )}
           </div>
@@ -797,26 +882,26 @@ export default function OrgDashboard() {
         {/* ── VOLUNTEERS TAB ── */}
         {activeTab === 'volunteers' && (
           <div className="flex flex-col gap-4">
-            <h3 className="font-bold text-gray-700">All Registered Volunteers ({totalVolunteers})</h3>
+            <h3 className="font-bold text-gray-700 dark:text-slate-300">All Registered Volunteers ({totalVolunteers})</h3>
             {totalVolunteers === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl shadow">
+              <div className="text-center py-16 bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none">
                 <p className="text-5xl mb-4">👥</p>
-                <h3 className="text-lg font-bold text-gray-700">No Volunteers Yet</h3>
-                <p className="text-gray-400 text-sm mt-2">
+                <h3 className="text-lg font-bold text-gray-700 dark:text-slate-300">No Volunteers Yet</h3>
+                <p className="text-gray-400 dark:text-slate-500 text-sm mt-2">
                   Volunteers who register for your events will appear here.
                 </p>
               </div>
             ) : (
               events.map(event =>
                 event.registeredVolunteers?.length > 0 && (
-                  <div key={event._id} className="bg-white rounded-2xl shadow p-6">
-                    <h4 className="font-bold text-gray-700 mb-3">📅 {event.title}</h4>
+                  <div key={event._id} className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6">
+                    <h4 className="font-bold text-gray-700 dark:text-slate-300 mb-3">📅 {event.title}</h4>
                     <div className="flex flex-col gap-2">
                       {event.registeredVolunteers.map(vol => (
-                        <div key={vol._id} className="flex justify-between items-center bg-gray-50 rounded-xl px-4 py-3">
+                        <div key={vol._id} className="flex justify-between items-center bg-gray-50 dark:bg-slate-800/60 rounded-xl px-4 py-3">
                           <div>
-                            <p className="text-sm font-semibold text-gray-800">{vol.name}</p>
-                            <p className="text-xs text-gray-500">{vol.email} · 📞 {vol.phone}</p>
+                            <p className="text-sm font-semibold text-gray-800 dark:text-white">{vol.name}</p>
+                            <p className="text-xs text-gray-500 dark:text-slate-400">{vol.email} · 📞 {vol.phone}</p>
                             <div className="flex gap-1 mt-1 flex-wrap">
                               {vol.skills?.map(s => (
                                 <span key={s} className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">{s}</span>

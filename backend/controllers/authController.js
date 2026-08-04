@@ -162,6 +162,43 @@ const updateVolunteerProfile = async (req, res) => {
   }
 }
 
+// -------- GET ADMIN PROFILE --------
+const getAdminProfile = async (req, res) => {
+  try {
+    const admin = await User.findOne({ _id: req.user.id, role: 'admin' }).select('-password')
+    if (!admin) return res.status(404).json({ message: 'Admin not found' })
+    res.json(admin)
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message })
+  }
+}
+
+// -------- UPDATE ADMIN PROFILE --------
+const updateAdminProfile = async (req, res) => {
+  try {
+    const { name, phone, location, currentPassword, newPassword } = req.body
+    const admin = await User.findOne({ _id: req.user.id, role: 'admin' })
+    if (!admin) return res.status(404).json({ message: 'Admin not found' })
+
+    if (name) admin.name = name
+    if (phone) admin.phone = phone
+    if (location) admin.location = location
+
+    if (currentPassword && newPassword) {
+      const isMatch = await bcrypt.compare(currentPassword, admin.password)
+      if (!isMatch) return res.status(401).json({ message: 'Current password is incorrect' })
+      if (newPassword.length < 6) return res.status(400).json({ message: 'New password must be at least 6 characters' })
+      admin.password = await bcrypt.hash(newPassword, 10)
+    }
+
+    await admin.save()
+    const updated = await User.findById(req.user.id).select('-password')
+    res.json({ message: 'Profile updated successfully', user: updated })
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message })
+  }
+}
+
 // -------- GET ORG PROFILE --------
 const getOrgProfile = async (req, res) => {
   try {
@@ -283,6 +320,7 @@ module.exports = {
   registerVolunteer, registerOrganization, login,
   getVolunteerProfile, updateVolunteerProfile,
   getOrgProfile, updateOrgProfile,
+  getAdminProfile, updateAdminProfile,
   getPendingOrgs, verifyOrganization,
   rejectOrganization, getAllVolunteers, deleteVolunteer,
 }

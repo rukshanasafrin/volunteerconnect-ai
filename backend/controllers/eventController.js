@@ -1,6 +1,7 @@
 const Event = require('../models/Event')
 const Organization = require('../models/Organization')
 const User = require('../models/User')
+const { getIO } = require('../socket')
 
 // -------- CREATE EVENT (Org) --------
 const createEvent = async (req, res) => {
@@ -24,6 +25,12 @@ const createEvent = async (req, res) => {
     })
 
     res.status(201).json({ message: 'Event created successfully', event })
+
+    try {
+      getIO().emit('event:new', event)
+    } catch (socketErr) {
+      console.error('Socket emit failed:', socketErr.message)
+    }
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message })
   }
@@ -109,6 +116,17 @@ const registerForEvent = async (req, res) => {
 
     await event.save()
     res.json({ message: 'Successfully registered for event' })
+
+    try {
+      getIO().emit('event:updated', {
+        _id: event._id,
+        registeredVolunteers: event.registeredVolunteers,
+        volunteersNeeded: event.volunteersNeeded,
+        status: event.status,
+      })
+    } catch (socketErr) {
+      console.error('Socket emit failed:', socketErr.message)
+    }
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message })
   }
@@ -159,6 +177,16 @@ const updateVolunteerStatus = async (req, res) => {
     await event.save()
 
     res.json({ message: `Volunteer ${status} successfully` })
+
+    try {
+      getIO().emit('registration:status', {
+        eventId: event._id,
+        volunteerId,
+        status,
+      })
+    } catch (socketErr) {
+      console.error('Socket emit failed:', socketErr.message)
+    }
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message })
   }
@@ -174,6 +202,12 @@ const deleteEvent = async (req, res) => {
     }
     await event.deleteOne()
     res.json({ message: 'Event deleted successfully' })
+
+    try {
+      getIO().emit('event:deleted', { _id: req.params.id })
+    } catch (socketErr) {
+      console.error('Socket emit failed:', socketErr.message)
+    }
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message })
   }
@@ -258,6 +292,12 @@ const updateEvent = async (req, res) => {
     if (volunteersNeeded) event.volunteersNeeded = volunteersNeeded
     await event.save()
     res.json({ message: 'Event updated successfully', event })
+
+    try {
+      getIO().emit('event:updated', event)
+    } catch (socketErr) {
+      console.error('Socket emit failed:', socketErr.message)
+    }
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message })
   }

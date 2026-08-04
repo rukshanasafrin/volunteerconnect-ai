@@ -1,12 +1,16 @@
 const express = require('express')
+const http = require('http')
 const cors = require('cors')
 const dotenv = require('dotenv')
 const connectDB = require('./config/db')
+const { initSocket } = require('./socket')
 
 dotenv.config()
 connectDB()
 
 const app = express()
+const httpServer = http.createServer(app)
+initSocket(httpServer)
 
 app.use(cors({
   origin: ['http://localhost:5173', 'http://localhost:3000'],
@@ -51,4 +55,4 @@ process.on('unhandledRejection', (err) => {
 })
 
 const PORT = process.env.PORT || 8000
-app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`))
+httpServer.listen(PORT, () => console.log(`✅ Server running on port ${PORT} (HTTP + WebSocket)`))

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import EditProfileForm from '../components/EditProfileForm'
 import API from '../api'
+import socket from '../socket'
 
 
 export default function VolunteerDashboard() {
@@ -43,6 +44,41 @@ export default function VolunteerDashboard() {
   useEffect(() => {
     fetchLeaderboard(leaderboardSort)
   }, [leaderboardSort])
+
+  // Live updates: new events posted by organizations appear instantly,
+  // and open/closed status + registration approvals update without a refresh.
+  useEffect(() => {
+    const handleNewEvent = (event) => {
+      setEvents((prev) => (prev.some(e => e._id === event._id) ? prev : [event, ...prev]))
+    }
+
+    const handleEventUpdated = (patch) => {
+      setEvents((prev) => prev.map(e => (e._id === patch._id ? { ...e, ...patch } : e)))
+    }
+
+    const handleEventDeleted = ({ _id }) => {
+      setEvents((prev) => prev.filter(e => e._id !== _id))
+      setMyEvents((prev) => prev.filter(e => e._id !== _id))
+    }
+
+    const handleRegistrationStatus = ({ eventId, status }) => {
+      setMyEvents((prev) =>
+        prev.map(e => (e._id === eventId ? { ...e, registrationStatus: status } : e))
+      )
+    }
+
+    socket.on('event:new', handleNewEvent)
+    socket.on('event:updated', handleEventUpdated)
+    socket.on('event:deleted', handleEventDeleted)
+    socket.on('registration:status', handleRegistrationStatus)
+
+    return () => {
+      socket.off('event:new', handleNewEvent)
+      socket.off('event:updated', handleEventUpdated)
+      socket.off('event:deleted', handleEventDeleted)
+      socket.off('registration:status', handleRegistrationStatus)
+    }
+  }, [])
 
   const fetchAll = async () => {
     try {
@@ -172,6 +208,38 @@ export default function VolunteerDashboard() {
     return myEvents.some(e => e._id === eventId)
   }
 
+  const EVENT_CATEGORY_META = [
+    { key: 'environment', label: 'Environment', emoji: '🌱', badge: 'bg-emerald-100 text-emerald-700' },
+    { key: 'education', label: 'Education', emoji: '🎓', badge: 'bg-blue-100 text-blue-700' },
+    { key: 'health', label: 'Health', emoji: '🏥', badge: 'bg-rose-100 text-rose-700' },
+    { key: 'community', label: 'Community', emoji: '🤝', badge: 'bg-amber-100 text-amber-700' },
+    { key: 'disaster relief', label: 'Disaster Relief', emoji: '🚨', badge: 'bg-orange-100 text-orange-700' },
+    { key: 'animal welfare', label: 'Animal Welfare', emoji: '🐾', badge: 'bg-purple-100 text-purple-700' },
+    { key: 'other', label: 'Other', emoji: '✨', badge: 'bg-gray-100 text-gray-700 dark:text-slate-300' },
+  ]
+
+  const getCategoryMeta = (key) =>
+    EVENT_CATEGORY_META.find(c => c.key === key) || EVENT_CATEGORY_META[EVENT_CATEGORY_META.length - 1]
+
+  const getEventOpenStatus = (event) => {
+    const capacity = Number(event.volunteersNeeded) || 0
+    const registeredCount = event.registeredVolunteers?.length || 0
+    const lifecycleClosed = Boolean(event.status) && event.status !== 'upcoming'
+    return !lifecycleClosed && registeredCount < capacity
+  }
+
+  const groupEventsByCategory = (list) => {
+    const groups = new Map()
+    list.forEach(event => {
+      const key = EVENT_CATEGORY_META.some(c => c.key === event.category) ? event.category : 'other'
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key).push(event)
+    })
+    return EVENT_CATEGORY_META
+      .map(meta => ({ meta, events: groups.get(meta.key) || [] }))
+      .filter(group => group.events.length > 0)
+  }
+
   const tabs = ['overview', 'events', 'my events', 'certificates', 'performance', 'leaderboard', 'edit profile']
 
   const LEADERBOARD_SORT_OPTIONS = [
@@ -182,17 +250,17 @@ export default function VolunteerDashboard() {
 
   const RANK_MEDAL = { 1: '🥇', 2: '🥈', 3: '🥉' }
   const RANK_STYLES = {
-    1: 'bg-yellow-50 border-yellow-300',
-    2: 'bg-gray-50 border-gray-300',
+    1: 'bg-yellow-50 dark:bg-yellow-500/10 border-yellow-300',
+    2: 'bg-gray-50 dark:bg-slate-800/60 border-gray-300 dark:border-slate-700',
     3: 'bg-orange-50 border-orange-300',
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0B0F19] transition-colors duration-300">
         <div className="text-center">
           <div className="text-5xl mb-4">⏳</div>
-          <p className="text-gray-500 font-medium">Loading your dashboard...</p>
+          <p className="text-gray-500 dark:text-slate-400 font-medium">Loading your dashboard...</p>
         </div>
       </div>
     )
@@ -220,15 +288,15 @@ export default function VolunteerDashboard() {
 }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0B0F19] transition-colors duration-300">
 
       {/* Top Bar */}
-      <div className="bg-white shadow-sm px-8 py-4 flex justify-between items-center">
+      <div className="bg-white shadow-sm dark:bg-[#151D2A] dark:shadow-none dark:border-b dark:border-slate-800 px-8 py-4 flex justify-between items-center">
         <h1 className="text-xl font-bold text-primary">🤝 VolunteerConnect</h1>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">👋 Hello, {profile?.name}</span>
+          <span className="text-sm text-gray-600 dark:text-slate-300">👋 Hello, {profile?.name}</span>
           <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-semibold">Volunteer</span>
-          <button onClick={handleLogout} className="text-sm bg-red-50 text-red-500 px-4 py-2 rounded-lg hover:bg-red-100 transition">
+          <button onClick={handleLogout} className="text-sm bg-red-50 dark:bg-red-500/10 text-red-500 px-4 py-2 rounded-lg hover:bg-red-100 transition">
             Logout
           </button>
         </div>
@@ -244,15 +312,15 @@ export default function VolunteerDashboard() {
       <div className="max-w-6xl mx-auto px-6 py-8">
 
         {/* Profile Card */}
-        <div className="bg-white rounded-2xl shadow p-6 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">{profile?.name}</h2>
-            <p className="text-gray-500 text-sm mt-1">
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{profile?.name}</h2>
+            <p className="text-gray-500 dark:text-slate-400 text-sm mt-1">
               📧 {profile?.email} &nbsp;|&nbsp;
               📍 {profile?.location} &nbsp;|&nbsp;
               🕐 {profile?.availability}
             </p>
-            <p className="text-gray-500 text-sm mt-1">🌐 {profile?.languages?.join(', ')}</p>
+            <p className="text-gray-500 dark:text-slate-400 text-sm mt-1">🌐 {profile?.languages?.join(', ')}</p>
             <div className="flex flex-wrap gap-2 mt-3">
               {profile?.skills?.map(skill => (
                 <span key={skill} className="bg-blue-100 text-blue-700 text-xs px-3 py-1 rounded-full font-medium">
@@ -276,22 +344,22 @@ export default function VolunteerDashboard() {
             { label: 'Registered Events', value: myEvents.length, icon: '📋' },
             { label: 'Member Since', value: new Date(profile?.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }), icon: '📌' },
           ].map(stat => (
-            <div key={stat.label} className="bg-white rounded-2xl shadow p-4 text-center">
+            <div key={stat.label} className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-4 text-center">
               <div className="text-3xl mb-1">{stat.icon}</div>
-              <div className="text-xl font-bold text-gray-800">{stat.value}</div>
-              <div className="text-xs text-gray-500 mt-1">{stat.label}</div>
+              <div className="text-xl font-bold text-gray-800 dark:text-white">{stat.value}</div>
+              <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">{stat.label}</div>
             </div>
           ))}
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-gray-200 overflow-x-auto">
+        <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-slate-700 overflow-x-auto">
           {tabs.map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 text-sm font-semibold capitalize transition border-b-2 -mb-px whitespace-nowrap
-                ${activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                ${activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:text-slate-300'}`}
             >
               {tab}
             </button>
@@ -303,34 +371,34 @@ export default function VolunteerDashboard() {
           <div className="grid md:grid-cols-2 gap-6">
 
             {/* AI Recommended Events */}
-            <div className="bg-white rounded-2xl shadow p-6">
+            <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6">
               <div className="flex items-center gap-2 mb-4">
-                <h3 className="font-bold text-gray-800">🤖 AI Recommended for You</h3>
+                <h3 className="font-bold text-gray-800 dark:text-white">🤖 AI Recommended for You</h3>
                 {aiLoading && (
-                  <span className="text-xs text-gray-400 animate-pulse">Analyzing...</span>
+                  <span className="text-xs text-gray-400 dark:text-slate-500 animate-pulse">Analyzing...</span>
                 )}
               </div>
               {aiRecommendations.length === 0 && !aiLoading ? (
                 <div className="text-center py-8">
                   <p className="text-3xl mb-2">🔍</p>
-                  <p className="text-gray-400 text-sm">Add more skills to get better recommendations</p>
+                  <p className="text-gray-400 dark:text-slate-500 text-sm">Add more skills to get better recommendations</p>
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
                   {aiRecommendations.slice(0, 3).map(rec => (
-                    <div key={rec.event._id} className="border border-gray-100 rounded-xl p-4 hover:border-primary transition">
+                    <div key={rec.event._id} className="border border-gray-100 dark:border-slate-800 rounded-xl p-4 hover:border-primary transition">
                       <div className="flex justify-between items-start mb-2">
                         <div className="flex-1">
-                          <p className="font-semibold text-gray-800 text-sm">{rec.event.title}</p>
-                          <p className="text-xs text-gray-500">{rec.event.orgName} · {new Date(rec.event.date).toLocaleDateString()}</p>
+                          <p className="font-semibold text-gray-800 dark:text-white text-sm">{rec.event.title}</p>
+                          <p className="text-xs text-gray-500 dark:text-slate-400">{rec.event.orgName} · {new Date(rec.event.date).toLocaleDateString()}</p>
                         </div>
                         <div className="text-center ml-3">
                           <div className={`text-lg font-black
                             ${rec.matchScore >= 70 ? 'text-green-600' :
-                              rec.matchScore >= 40 ? 'text-yellow-600' : 'text-gray-400'}`}>
+                              rec.matchScore >= 40 ? 'text-yellow-600' : 'text-gray-400 dark:text-slate-500'}`}>
                             {rec.matchScore}%
                           </div>
-                          <div className="text-xs text-gray-400">match</div>
+                          <div className="text-xs text-gray-400 dark:text-slate-500">match</div>
                         </div>
                       </div>
 
@@ -341,9 +409,9 @@ export default function VolunteerDashboard() {
                           { label: 'Location', value: rec.breakdown.location },
                           { label: 'Availability', value: rec.breakdown.availability },
                         ].map(b => (
-                          <div key={b.label} className="text-center bg-gray-50 rounded-lg py-1.5">
-                            <div className="text-xs font-bold text-gray-700">{b.value}%</div>
-                            <div className="text-xs text-gray-400">{b.label}</div>
+                          <div key={b.label} className="text-center bg-gray-50 dark:bg-slate-800/60 rounded-lg py-1.5">
+                            <div className="text-xs font-bold text-gray-700 dark:text-slate-300">{b.value}%</div>
+                            <div className="text-xs text-gray-400 dark:text-slate-500">{b.label}</div>
                           </div>
                         ))}
                       </div>
@@ -353,7 +421,7 @@ export default function VolunteerDashboard() {
                         disabled={isRegistered(rec.event._id)}
                         className={`w-full py-1.5 rounded-lg text-xs font-semibold transition
                           ${isRegistered(rec.event._id)
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            ? 'bg-gray-100 text-gray-400 dark:text-slate-500 cursor-not-allowed'
                             : 'bg-primary text-white hover:bg-blue-700'}`}
                       >
                         {isRegistered(rec.event._id) ? 'Registered ✓' : 'Register Now'}
@@ -365,12 +433,12 @@ export default function VolunteerDashboard() {
             </div>
 
             {/* My Recent Events */}
-            <div className="bg-white rounded-2xl shadow p-6">
-              <h3 className="font-bold text-gray-800 mb-4">📋 My Recent Events</h3>
+            <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6">
+              <h3 className="font-bold text-gray-800 dark:text-white mb-4">📋 My Recent Events</h3>
               {myEvents.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-3xl mb-2">🗓️</p>
-                  <p className="text-gray-400 text-sm">No events registered yet</p>
+                  <p className="text-gray-400 dark:text-slate-500 text-sm">No events registered yet</p>
                   <button
                     onClick={() => setActiveTab('events')}
                     className="mt-3 text-primary text-sm font-semibold hover:underline"
@@ -383,8 +451,8 @@ export default function VolunteerDashboard() {
                   {myEvents.slice(0, 4).map(event => (
                     <div key={event._id} className="flex justify-between items-center border-b border-gray-50 pb-3">
                       <div>
-                        <p className="text-sm font-semibold text-gray-800">{event.title}</p>
-                        <p className="text-xs text-gray-500">{event.orgName} · {new Date(event.date).toLocaleDateString()}</p>
+                        <p className="text-sm font-semibold text-gray-800 dark:text-white">{event.title}</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400">{event.orgName} · {new Date(event.date).toLocaleDateString()}</p>
                       </div>
                       <span className={`text-xs px-3 py-1 rounded-full font-medium capitalize
                         ${event.registrationStatus === 'approved' ? 'bg-green-100 text-green-700' :
@@ -403,36 +471,36 @@ export default function VolunteerDashboard() {
 
         {/* Skill Gap Growth Advisor */}
         {activeTab === 'overview' && (
-          <div className="bg-white rounded-2xl shadow p-6 mt-6">
+          <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6 mt-6">
             <div className="flex items-center gap-2 mb-4">
-              <h3 className="font-bold text-gray-800">📈 Skill Gap Growth Advisor</h3>
+              <h3 className="font-bold text-gray-800 dark:text-white">📈 Skill Gap Growth Advisor</h3>
               {skillGapLoading && (
-                <span className="text-xs text-gray-400 animate-pulse">Analyzing...</span>
+                <span className="text-xs text-gray-400 dark:text-slate-500 animate-pulse">Analyzing...</span>
               )}
             </div>
             {!skillGap && !skillGapLoading ? (
               <div className="text-center py-8">
                 <p className="text-3xl mb-2">📊</p>
-                <p className="text-gray-400 text-sm">No growth data available yet</p>
+                <p className="text-gray-400 dark:text-slate-500 text-sm">No growth data available yet</p>
               </div>
             ) : skillGap && skillGap.suggestions.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-3xl mb-2">🎉</p>
-                <p className="text-gray-700 text-sm font-semibold">You're eligible for all {skillGap.qualifiedEvents} open event(s) right now!</p>
-                <p className="text-gray-400 text-xs mt-1">{skillGap.explanation}</p>
+                <p className="text-gray-700 dark:text-slate-300 text-sm font-semibold">You're eligible for all {skillGap.qualifiedEvents} open event(s) right now!</p>
+                <p className="text-gray-400 dark:text-slate-500 text-xs mt-1">{skillGap.explanation}</p>
               </div>
             ) : skillGap ? (
               <div className="flex flex-col gap-4">
                 <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4">
                   <p className="text-xs font-semibold text-indigo-600 mb-1">🤖 AI Growth Tip</p>
-                  <p className="text-sm text-gray-700 leading-relaxed">{skillGap.explanation}</p>
+                  <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed">{skillGap.explanation}</p>
                 </div>
 
                 <div className="flex flex-col gap-3">
                   {skillGap.suggestions.map((s, idx) => (
-                    <div key={s.skill} className={`border rounded-xl p-4 ${idx === 0 ? 'border-primary bg-blue-50/40' : 'border-gray-100'}`}>
+                    <div key={s.skill} className={`border rounded-xl p-4 ${idx === 0 ? 'border-primary bg-blue-50/40' : 'border-gray-100 dark:border-slate-800'}`}>
                       <div className="flex justify-between items-center mb-2">
-                        <p className="text-sm font-semibold text-gray-800 capitalize">
+                        <p className="text-sm font-semibold text-gray-800 dark:text-white capitalize">
                           {idx === 0 && '🏆 '}{s.skill}
                         </p>
                         <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-semibold">
@@ -440,12 +508,12 @@ export default function VolunteerDashboard() {
                         </span>
                       </div>
                       {s.partialUnlockCount > 0 && (
-                        <p className="text-xs text-gray-500 mb-2">+ helps with {s.partialUnlockCount} more event{s.partialUnlockCount === 1 ? '' : 's'}</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">+ helps with {s.partialUnlockCount} more event{s.partialUnlockCount === 1 ? '' : 's'}</p>
                       )}
                       {s.directUnlocks.length > 0 && (
                         <div className="flex flex-wrap gap-1.5">
                           {s.directUnlocks.slice(0, 4).map(ev => (
-                            <span key={ev._id} className="text-xs bg-white border border-gray-200 text-gray-600 px-2 py-1 rounded-lg">
+                            <span key={ev._id} className="text-xs bg-white border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 px-2 py-1 rounded-lg">
                               {ev.title}
                             </span>
                           ))}
@@ -455,7 +523,7 @@ export default function VolunteerDashboard() {
                   ))}
                 </div>
 
-                <p className="text-xs text-gray-400 text-center">
+                <p className="text-xs text-gray-400 dark:text-slate-500 text-center">
                   You're currently eligible for {skillGap.qualifiedEvents} of {skillGap.totalOpenEvents} open events
                 </p>
               </div>
@@ -465,49 +533,80 @@ export default function VolunteerDashboard() {
 
         {/* ── EVENTS TAB ── */}
         {activeTab === 'events' && (
-          <div className="flex flex-col gap-4">
-            <h3 className="font-bold text-gray-700">Available Events ({events.length})</h3>
+          <div className="flex flex-col gap-8">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h3 className="font-bold text-gray-700 dark:text-slate-300">Available Events ({events.length})</h3>
+              <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
+                {events.filter(getEventOpenStatus).length} open
+              </span>
+            </div>
+
             {events.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl shadow">
+              <div className="text-center py-16 bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none">
                 <p className="text-5xl mb-4">📅</p>
-                <h3 className="text-lg font-bold text-gray-700">No Events Available Yet</h3>
-                <p className="text-gray-400 text-sm mt-2">Events will appear here once organizations post them.</p>
+                <h3 className="text-lg font-bold text-gray-700 dark:text-slate-300">No Events Available Yet</h3>
+                <p className="text-gray-400 dark:text-slate-500 text-sm mt-2">Events will appear here once organizations post them.</p>
               </div>
             ) : (
-              events.map(event => (
-                <div key={event._id} className="bg-white rounded-2xl shadow p-6 flex flex-col md:flex-row justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <h4 className="font-bold text-gray-800">{event.title}</h4>
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full capitalize">
-                        {event.category}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-500">{event.orgName}</p>
-                    <p className="text-sm text-gray-600 mt-2">{event.description}</p>
-                    <div className="flex flex-wrap gap-4 mt-3 text-xs text-gray-500">
-                      <span>📅 {new Date(event.date).toLocaleDateString()}</span>
-                      <span>📍 {event.location}</span>
-                      <span>⏱️ {event.duration}</span>
-                      <span>👥 {event.registeredVolunteers?.length}/{event.volunteersNeeded}</span>
-                    </div>
-                    <div className="flex gap-2 mt-3 flex-wrap">
-                      {event.skillsRequired?.map(s => (
-                        <span key={s} className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">{s}</span>
-                      ))}
-                    </div>
+              groupEventsByCategory(events).map(({ meta, events: categoryEvents }) => (
+                <div key={meta.key}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-xl">{meta.emoji}</span>
+                    <h4 className="font-bold text-gray-800 dark:text-white">{meta.label}</h4>
+                    <span className="text-xs text-gray-400 dark:text-slate-500 font-semibold">
+                      {categoryEvents.length} {categoryEvents.length === 1 ? 'event' : 'events'}
+                    </span>
                   </div>
-                  <div className="flex items-center">
-                    <button
-                      onClick={() => handleRegister(event._id, event.title)}
-                      disabled={isRegistered(event._id)}
-                      className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition
-                        ${isRegistered(event._id)
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-primary text-white hover:bg-blue-700'}`}
-                    >
-                      {isRegistered(event._id) ? 'Registered ✓' : 'Register'}
-                    </button>
+
+                  <div className="flex flex-col gap-4">
+                    {categoryEvents.map(event => {
+                      const isOpen = getEventOpenStatus(event)
+
+                      return (
+                        <div key={event._id} className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6 flex flex-col md:flex-row justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <h4 className="font-bold text-gray-800 dark:text-white">{event.title}</h4>
+                              <span className={`text-xs px-2 py-0.5 rounded-full capitalize font-semibold ${meta.badge}`}>
+                                {meta.emoji} {meta.label}
+                              </span>
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                                isOpen ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500 dark:text-slate-400'
+                              }`}>
+                                {isOpen ? '🟢 Open' : '🔒 Closed'}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-500 dark:text-slate-400">{event.orgName}</p>
+                            <p className="text-sm text-gray-600 dark:text-slate-300 mt-2">{event.description}</p>
+                            <div className="flex flex-wrap gap-4 mt-3 text-xs text-gray-500 dark:text-slate-400">
+                              <span>📅 {new Date(event.date).toLocaleDateString()}</span>
+                              <span>📍 {event.location}</span>
+                              <span>⏱️ {event.duration}</span>
+                              <span>👥 {event.registeredVolunteers?.length}/{event.volunteersNeeded}</span>
+                            </div>
+                            <div className="flex gap-2 mt-3 flex-wrap">
+                              {event.skillsRequired?.map(s => (
+                                <span key={s} className="bg-gray-100 text-gray-600 dark:text-slate-300 text-xs px-2 py-1 rounded-full">{s}</span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex items-center">
+                            <button
+                              onClick={() => handleRegister(event._id, event.title)}
+                              disabled={isRegistered(event._id) || !isOpen}
+                              className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition
+                                ${isRegistered(event._id)
+                                  ? 'bg-gray-100 text-gray-400 dark:text-slate-500 cursor-not-allowed'
+                                  : !isOpen
+                                  ? 'bg-gray-100 text-gray-400 dark:text-slate-500 cursor-not-allowed'
+                                  : 'bg-primary text-white hover:bg-blue-700'}`}
+                            >
+                              {isRegistered(event._id) ? 'Registered ✓' : !isOpen ? 'Closed' : 'Register'}
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               ))
@@ -518,12 +617,12 @@ export default function VolunteerDashboard() {
         {/* ── MY EVENTS TAB ── */}
         {activeTab === 'my events' && (
           <div className="flex flex-col gap-4">
-            <h3 className="font-bold text-gray-700">Your Registered Events ({myEvents.length})</h3>
+            <h3 className="font-bold text-gray-700 dark:text-slate-300">Your Registered Events ({myEvents.length})</h3>
             {myEvents.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl shadow">
+              <div className="text-center py-16 bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none">
                 <p className="text-5xl mb-4">🗓️</p>
-                <h3 className="text-lg font-bold text-gray-700">No Events Registered Yet</h3>
-                <p className="text-gray-400 text-sm mt-2">Browse events and register to get started!</p>
+                <h3 className="text-lg font-bold text-gray-700 dark:text-slate-300">No Events Registered Yet</h3>
+                <p className="text-gray-400 dark:text-slate-500 text-sm mt-2">Browse events and register to get started!</p>
                 <button
                   onClick={() => setActiveTab('events')}
                   className="mt-4 bg-primary text-white px-6 py-2 rounded-xl text-sm font-semibold hover:bg-blue-700 transition"
@@ -533,10 +632,10 @@ export default function VolunteerDashboard() {
               </div>
             ) : (
               myEvents.map(event => (
-  <div key={event._id} className="bg-white rounded-2xl shadow p-6 flex justify-between items-center gap-4">
+  <div key={event._id} className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6 flex justify-between items-center gap-4">
     <div>
-      <h4 className="font-bold text-gray-800">{event.title}</h4>
-      <p className="text-sm text-gray-500 mt-1">
+      <h4 className="font-bold text-gray-800 dark:text-white">{event.title}</h4>
+      <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
         {event.orgName} · 📅 {new Date(event.date).toLocaleDateString()} · 📍 {event.location}
       </p>
       <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full capitalize mt-2 inline-block">
@@ -553,7 +652,7 @@ export default function VolunteerDashboard() {
       {event.registrationStatus === 'approved' && (
         <button
           onClick={() => setFeedbackModal(event)}
-          className="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition font-semibold"
+          className="text-xs bg-blue-50 dark:bg-blue-500/10 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition font-semibold"
         >
           💬 Give Feedback
         </button>
@@ -568,20 +667,20 @@ export default function VolunteerDashboard() {
         {/* ── CERTIFICATES TAB ── */}
         {activeTab === 'certificates' && (
           <div className="flex flex-col gap-4">
-            <h3 className="font-bold text-gray-700">Your Certificates</h3>
+            <h3 className="font-bold text-gray-700 dark:text-slate-300">Your Certificates</h3>
             {myEvents.filter(e => e.status === 'completed').length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl shadow">
+              <div className="text-center py-16 bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none">
                 <p className="text-5xl mb-4">🏆</p>
-                <h3 className="text-lg font-bold text-gray-700">No Certificates Yet</h3>
-                <p className="text-gray-400 text-sm mt-2">Complete events to earn certificates.</p>
+                <h3 className="text-lg font-bold text-gray-700 dark:text-slate-300">No Certificates Yet</h3>
+                <p className="text-gray-400 dark:text-slate-500 text-sm mt-2">Complete events to earn certificates.</p>
               </div>
             ) : (
               myEvents.filter(e => e.status === 'completed').map(event => (
-                <div key={event._id} className="bg-white rounded-2xl shadow p-6 border-l-4 border-primary flex justify-between items-center">
+                <div key={event._id} className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6 border-l-4 border-primary flex justify-between items-center">
                   <div>
                     <p className="text-2xl mb-1">🏆</p>
-                    <h4 className="font-bold text-gray-800">{event.title}</h4>
-                    <p className="text-sm text-gray-500">{event.orgName} · {new Date(event.date).toLocaleDateString()}</p>
+                    <h4 className="font-bold text-gray-800 dark:text-white">{event.title}</h4>
+                    <p className="text-sm text-gray-500 dark:text-slate-400">{event.orgName} · {new Date(event.date).toLocaleDateString()}</p>
                   </div>
                   <button
   onClick={() => handleDownloadCertificate(event._id)}
@@ -602,14 +701,14 @@ export default function VolunteerDashboard() {
   <div className="flex flex-col gap-6">
 
     {perfLoading ? (
-      <div className="text-center py-16 bg-white rounded-2xl shadow">
+      <div className="text-center py-16 bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none">
         <p className="text-4xl mb-3 animate-pulse">📊</p>
-        <p className="text-gray-400">Calculating your score...</p>
+        <p className="text-gray-400 dark:text-slate-500">Calculating your score...</p>
       </div>
     ) : performance ? (
       <>
         {/* Score Card */}
-        <div className="bg-white rounded-2xl shadow p-6">
+        <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="text-center">
               <div className="relative w-36 h-36 mx-auto">
@@ -624,12 +723,12 @@ export default function VolunteerDashboard() {
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-black text-gray-800">{performance.score}</span>
-                  <span className="text-xs text-gray-400">/ 100</span>
+                  <span className="text-3xl font-black text-gray-800 dark:text-white">{performance.score}</span>
+                  <span className="text-xs text-gray-400 dark:text-slate-500">/ 100</span>
                 </div>
               </div>
               <p className="text-lg font-bold mt-3">{performance.rank}</p>
-              <p className="text-sm text-gray-500">Performance Score</p>
+              <p className="text-sm text-gray-500 dark:text-slate-400">Performance Score</p>
             </div>
 
             <div className="flex-1 grid grid-cols-2 gap-4">
@@ -639,10 +738,10 @@ export default function VolunteerDashboard() {
                 { label: 'Avg Rating', value: `${performance.breakdown.feedback.avgRating}/5`, icon: '⭐', color: 'text-yellow-600' },
                 { label: 'Feedbacks Given', value: performance.totalFeedbacks, icon: '💬', color: 'text-purple-600' },
               ].map(stat => (
-                <div key={stat.label} className="bg-gray-50 rounded-xl p-4 text-center">
+                <div key={stat.label} className="bg-gray-50 dark:bg-slate-800/60 rounded-xl p-4 text-center">
                   <div className="text-2xl mb-1">{stat.icon}</div>
                   <div className={`text-xl font-bold ${stat.color}`}>{stat.value}</div>
-                  <div className="text-xs text-gray-500">{stat.label}</div>
+                  <div className="text-xs text-gray-500 dark:text-slate-400">{stat.label}</div>
                 </div>
               ))}
             </div>
@@ -696,8 +795,8 @@ export default function VolunteerDashboard() {
         </div>
 
         {/* Score Breakdown */}
-        <div className="bg-white rounded-2xl shadow p-6">
-          <h3 className="font-bold text-gray-800 mb-5">📊 Score Breakdown</h3>
+        <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6">
+          <h3 className="font-bold text-gray-800 dark:text-white mb-5">📊 Score Breakdown</h3>
           <div className="flex flex-col gap-5">
             {[
               {
@@ -705,7 +804,7 @@ export default function VolunteerDashboard() {
                 score: performance.breakdown.attendance.score,
                 max: performance.breakdown.attendance.max,
                 desc: `${performance.breakdown.attendance.eventsAttended} events attended`,
-                color: 'bg-blue-500',
+                color: 'bg-blue-50 dark:bg-blue-500/100',
                 tip: 'Attend more events to increase this score'
               },
               {
@@ -713,7 +812,7 @@ export default function VolunteerDashboard() {
                 score: performance.breakdown.feedback.score,
                 max: performance.breakdown.feedback.max,
                 desc: `Avg rating: ${performance.breakdown.feedback.avgRating}/5`,
-                color: 'bg-yellow-500',
+                color: 'bg-yellow-50 dark:bg-yellow-500/100',
                 tip: 'Give feedback after events to boost this score'
               },
               {
@@ -721,7 +820,7 @@ export default function VolunteerDashboard() {
                 score: performance.breakdown.approval.score,
                 max: performance.breakdown.approval.max,
                 desc: `${performance.breakdown.approval.approved} approved / ${performance.breakdown.approval.total} total`,
-                color: 'bg-green-500',
+                color: 'bg-green-50 dark:bg-green-500/100',
                 tip: 'Keep your skills updated to get more approvals'
               },
               {
@@ -729,17 +828,17 @@ export default function VolunteerDashboard() {
                 score: performance.breakdown.profile.score,
                 max: performance.breakdown.profile.max,
                 desc: `${performance.breakdown.profile.score * 10}% complete`,
-                color: 'bg-purple-500',
+                color: 'bg-purple-50 dark:bg-purple-500/100',
                 tip: 'Complete your profile to get full marks here'
               },
             ].map(item => (
               <div key={item.label}>
                 <div className="flex justify-between items-center mb-2">
                   <div>
-                    <span className="text-sm font-semibold text-gray-800">{item.label}</span>
-                    <span className="text-xs text-gray-400 ml-2">{item.desc}</span>
+                    <span className="text-sm font-semibold text-gray-800 dark:text-white">{item.label}</span>
+                    <span className="text-xs text-gray-400 dark:text-slate-500 ml-2">{item.desc}</span>
                   </div>
-                  <span className="text-sm font-bold text-gray-700">
+                  <span className="text-sm font-bold text-gray-700 dark:text-slate-300">
                     {item.score}/{item.max}
                   </span>
                 </div>
@@ -750,7 +849,7 @@ export default function VolunteerDashboard() {
                   />
                 </div>
                 {item.score < item.max && (
-                  <p className="text-xs text-gray-400 mt-1">💡 {item.tip}</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">💡 {item.tip}</p>
                 )}
               </div>
             ))}
@@ -758,13 +857,13 @@ export default function VolunteerDashboard() {
         </div>
 
         {/* Registration Stats */}
-        <div className="bg-white rounded-2xl shadow p-6">
-          <h3 className="font-bold text-gray-800 mb-4">📋 Registration Summary</h3>
+        <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6">
+          <h3 className="font-bold text-gray-800 dark:text-white mb-4">📋 Registration Summary</h3>
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: 'Applied', value: performance.breakdown.approval.applied, color: 'bg-yellow-50 text-yellow-700', border: 'border-yellow-200' },
-              { label: 'Approved', value: performance.breakdown.approval.approved, color: 'bg-green-50 text-green-700', border: 'border-green-200' },
-              { label: 'Rejected', value: performance.breakdown.approval.rejected, color: 'bg-red-50 text-red-700', border: 'border-red-200' },
+              { label: 'Applied', value: performance.breakdown.approval.applied, color: 'bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700', border: 'border-yellow-200' },
+              { label: 'Approved', value: performance.breakdown.approval.approved, color: 'bg-green-50 dark:bg-green-500/10 text-green-700', border: 'border-green-200' },
+              { label: 'Rejected', value: performance.breakdown.approval.rejected, color: 'bg-red-50 dark:bg-red-500/10 text-red-700', border: 'border-red-200' },
             ].map(stat => (
               <div key={stat.label} className={`${stat.color} border ${stat.border} rounded-xl p-4 text-center`}>
                 <div className="text-2xl font-bold">{stat.value}</div>
@@ -776,7 +875,7 @@ export default function VolunteerDashboard() {
 
         {/* How to Improve */}
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
-          <h3 className="font-bold text-gray-800 mb-4">🚀 How to Improve Your Score</h3>
+          <h3 className="font-bold text-gray-800 dark:text-white mb-4">🚀 How to Improve Your Score</h3>
           <div className="grid md:grid-cols-2 gap-3">
             {[
               { icon: '📅', text: 'Attend more volunteering events', points: '+4 pts per event' },
@@ -787,7 +886,7 @@ export default function VolunteerDashboard() {
               <div key={tip.text} className="flex items-start gap-3 bg-white rounded-xl p-3">
                 <span className="text-xl">{tip.icon}</span>
                 <div>
-                  <p className="text-sm font-medium text-gray-800">{tip.text}</p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-white">{tip.text}</p>
                   <p className="text-xs text-blue-600 font-semibold mt-0.5">{tip.points}</p>
                 </div>
               </div>
@@ -830,9 +929,9 @@ export default function VolunteerDashboard() {
               </div>
             )}
 
-            <div className="bg-white rounded-2xl shadow p-6">
+            <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6">
               <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
-                <h3 className="font-bold text-gray-800">🏆 Volunteer Leaderboard</h3>
+                <h3 className="font-bold text-gray-800 dark:text-white">🏆 Volunteer Leaderboard</h3>
                 <div className="flex gap-2 flex-wrap">
                   {LEADERBOARD_SORT_OPTIONS.map(opt => (
                     <button
@@ -841,7 +940,7 @@ export default function VolunteerDashboard() {
                       className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${
                         leaderboardSort === opt.key
                           ? 'bg-primary text-white'
-                          : 'bg-gray-50 text-gray-600 border border-gray-200 hover:border-primary'
+                          : 'bg-gray-50 dark:bg-slate-800/60 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-700 hover:border-primary'
                       }`}
                     >
                       {opt.label}
@@ -851,9 +950,9 @@ export default function VolunteerDashboard() {
               </div>
 
               {leaderboardLoading ? (
-                <p className="text-center text-gray-400 py-10">Loading leaderboard...</p>
+                <p className="text-center text-gray-400 dark:text-slate-500 py-10">Loading leaderboard...</p>
               ) : leaderboard.length === 0 ? (
-                <p className="text-center text-gray-400 py-10">No volunteers to rank yet — be the first!</p>
+                <p className="text-center text-gray-400 dark:text-slate-500 py-10">No volunteers to rank yet — be the first!</p>
               ) : (
                 <div className="space-y-2">
                   {leaderboard.map(v => {
@@ -872,31 +971,31 @@ export default function VolunteerDashboard() {
                       <div
                         key={v._id}
                         className={`flex items-center gap-4 p-4 rounded-xl border ${
-                          RANK_STYLES[v.rank] || 'bg-white border-gray-200'
+                          RANK_STYLES[v.rank] || 'bg-white border-gray-200 dark:border-slate-700'
                         } ${isMe ? 'ring-2 ring-primary' : ''}`}
                       >
-                        <div className="w-10 text-center font-bold text-gray-500 text-lg">
+                        <div className="w-10 text-center font-bold text-gray-500 dark:text-slate-400 text-lg">
                           {RANK_MEDAL[v.rank] || `#${v.rank}`}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-gray-800 truncate">
+                          <p className="font-semibold text-gray-800 dark:text-white truncate">
                             {v.name} {isMe && <span className="text-xs text-primary font-normal">(you)</span>}
                           </p>
-                          <p className="text-xs text-gray-400">{v.location}</p>
+                          <p className="text-xs text-gray-400 dark:text-slate-500">{v.location}</p>
                         </div>
                         {v.badge && (
-                          <span className="text-xs font-semibold text-primary bg-blue-50 px-2.5 py-1 rounded-full whitespace-nowrap">
+                          <span className="text-xs font-semibold text-primary bg-blue-50 dark:bg-blue-500/10 px-2.5 py-1 rounded-full whitespace-nowrap">
                             {v.badge}
                           </span>
                         )}
                         <div className="text-right w-24 shrink-0">
-                          <p className="font-bold text-gray-800">
+                          <p className="font-bold text-gray-800 dark:text-white">
                             {value}
                             {activeOption?.suffix && (
-                              <span className="text-xs text-gray-400">{activeOption.suffix}</span>
+                              <span className="text-xs text-gray-400 dark:text-slate-500">{activeOption.suffix}</span>
                             )}
                           </p>
-                          <p className="text-xs text-gray-400">{activeOption?.unit}</p>
+                          <p className="text-xs text-gray-400 dark:text-slate-500">{activeOption?.unit}</p>
                         </div>
                       </div>
                     )
@@ -924,11 +1023,11 @@ export default function VolunteerDashboard() {
       {/* Feedback Modal */}
 {feedbackModal && (
   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-    <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+    <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none-2xl p-6 w-full max-w-md">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="font-bold text-gray-800">💬 Submit Feedback</h3>
+        <h3 className="font-bold text-gray-800 dark:text-white">💬 Submit Feedback</h3>
         <button onClick={() => { setFeedbackModal(null); setFeedbackResult(null) }}
-          className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:text-slate-300 text-xl">✕</button>
       </div>
 
       {feedbackResult ? (
@@ -936,26 +1035,26 @@ export default function VolunteerDashboard() {
           <div className="text-5xl mb-3">
             {feedbackResult.sentiment === 'Positive' ? '😊' : feedbackResult.sentiment === 'Negative' ? '😞' : '😐'}
           </div>
-          <p className="font-bold text-lg text-gray-800 mb-1">
+          <p className="font-bold text-lg text-gray-800 dark:text-white mb-1">
             {feedbackResult.sentiment} Sentiment
           </p>
-          <p className="text-gray-500 text-sm mb-3">{feedbackResult.summary}</p>
+          <p className="text-gray-500 dark:text-slate-400 text-sm mb-3">{feedbackResult.summary}</p>
           <div className="flex flex-wrap justify-center gap-2">
             {feedbackResult.keywords?.map(k => (
               <span key={k} className="bg-blue-100 text-blue-700 text-xs px-3 py-1 rounded-full">{k}</span>
             ))}
           </div>
-          <p className="text-xs text-gray-400 mt-4">Closing automatically...</p>
+          <p className="text-xs text-gray-400 dark:text-slate-500 mt-4">Closing automatically...</p>
         </div>
       ) : (
         <form onSubmit={handleSubmitFeedback} className="flex flex-col gap-4">
           <div>
-            <p className="text-sm font-medium text-gray-700 mb-1">Event</p>
-            <p className="text-sm text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">{feedbackModal.title}</p>
+            <p className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Event</p>
+            <p className="text-sm text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-slate-800/60 px-3 py-2 rounded-lg">{feedbackModal.title}</p>
           </div>
 
           <div>
-            <p className="text-sm font-medium text-gray-700 mb-2">Rating</p>
+            <p className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Rating</p>
             <div className="flex gap-2">
               {[1, 2, 3, 4, 5].map(star => (
                 <button
@@ -967,22 +1066,22 @@ export default function VolunteerDashboard() {
                   ⭐
                 </button>
               ))}
-              <span className="text-sm text-gray-500 ml-2 self-center">{feedbackForm.rating}/5</span>
+              <span className="text-sm text-gray-500 dark:text-slate-400 ml-2 self-center">{feedbackForm.rating}/5</span>
             </div>
           </div>
 
           <div>
-            <p className="text-sm font-medium text-gray-700 mb-1">Your Feedback</p>
+            <p className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Your Feedback</p>
             <textarea
               value={feedbackForm.comment}
               onChange={e => setFeedbackForm({ ...feedbackForm, comment: e.target.value })}
               rows={4}
               placeholder="Share your experience at this event..."
-              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary transition resize-none"
+              className="w-full border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary transition resize-none"
             />
           </div>
 
-          <div className="bg-blue-50 rounded-xl p-3 text-xs text-blue-700">
+          <div className="bg-blue-50 dark:bg-blue-500/10 rounded-xl p-3 text-xs text-blue-700">
             🤖 AI will analyze your feedback sentiment automatically
           </div>
 

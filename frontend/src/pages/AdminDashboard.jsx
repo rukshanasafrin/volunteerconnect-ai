@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import API from '../api'
 import { MiniBarChart, MiniPieChart } from '../components/AdminCharts'
+import EditAdminProfileForm from '../components/EditAdminProfileForm'
 
 const CATEGORIES = ['education', 'environment', 'health', 'community', 'disaster relief', 'animal welfare', 'other']
 const EVENT_STATUSES = ['upcoming', 'ongoing', 'completed', 'cancelled']
 
 const STATUS_BADGE = {
   upcoming: 'bg-blue-100 text-blue-700', ongoing: 'bg-amber-100 text-amber-700',
-  completed: 'bg-green-100 text-green-700', cancelled: 'bg-gray-200 text-gray-600',
+  completed: 'bg-green-100 text-green-700', cancelled: 'bg-gray-200 text-gray-600 dark:text-slate-300',
 }
 
 export default function AdminDashboard() {
@@ -24,6 +25,26 @@ export default function AdminDashboard() {
     setTimeout(() => setNotification(''), 3000)
   }
   const handleLogout = () => { logout(); navigate('/') }
+
+  // ---------------- PROFILE ----------------
+  const [adminProfile, setAdminProfile] = useState(null)
+  const [profileLoading, setProfileLoading] = useState(false)
+
+  const fetchAdminProfile = useCallback(async () => {
+    try {
+      setProfileLoading(true)
+      const res = await API.get('/auth/admin/profile')
+      setAdminProfile(res.data)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setProfileLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (activeTab === 'edit profile' && !adminProfile) fetchAdminProfile()
+  }, [activeTab, adminProfile, fetchAdminProfile])
 
   // ---------------- OVERVIEW ----------------
   const [stats, setStats] = useState(null)
@@ -178,16 +199,16 @@ export default function AdminDashboard() {
   useEffect(() => { if (activeTab === 'events') fetchEvents() }, [activeTab, fetchEvents])
 
 
-  const tabs = ['overview', 'organizations', 'events', 'volunteers']
+  const tabs = ['overview', 'organizations', 'events', 'volunteers', 'edit profile']
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white shadow-sm px-8 py-4 flex justify-between items-center">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0B0F19] transition-colors duration-300">
+      <div className="bg-white shadow-sm dark:bg-[#151D2A] dark:shadow-none dark:border-b dark:border-slate-800 px-8 py-4 flex justify-between items-center">
         <h1 className="text-xl font-bold text-primary">🤝 VolunteerConnect</h1>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">👋 {user?.name}</span>
+          <span className="text-sm text-gray-600 dark:text-slate-300">👋 {user?.name}</span>
           <span className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-semibold">Admin</span>
-          <button onClick={handleLogout} className="text-sm bg-red-50 text-red-500 px-4 py-2 rounded-lg hover:bg-red-100 transition">Logout</button>
+          <button onClick={handleLogout} className="text-sm bg-red-50 dark:bg-red-500/10 text-red-500 px-4 py-2 rounded-lg hover:bg-red-100 transition">Logout</button>
         </div>
       </div>
 
@@ -200,11 +221,11 @@ export default function AdminDashboard() {
       <div className="max-w-6xl mx-auto px-6 py-8">
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-gray-200 overflow-x-auto">
+        <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-slate-700 overflow-x-auto">
           {tabs.map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 text-sm font-semibold capitalize transition border-b-2 -mb-px whitespace-nowrap
-                ${activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                ${activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:text-slate-300'}`}>
               {tab === 'organizations' && pendingOrgs.length > 0 ? `Organizations (${pendingOrgs.length} pending)` : tab}
             </button>
           ))}
@@ -214,20 +235,20 @@ export default function AdminDashboard() {
         {activeTab === 'overview' && (
           <>
             {overviewLoading ? (
-              <div className="text-center py-16 text-gray-400">Loading dashboard...</div>
+              <div className="text-center py-16 text-gray-400 dark:text-slate-500">Loading dashboard...</div>
             ) : (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                   {[
-                    { label: 'Volunteers', value: stats?.totalVolunteers ?? 0, icon: '👥', color: 'text-blue-600', bg: 'bg-blue-50' },
-                    { label: 'Organizations', value: stats?.totalOrganizations ?? 0, icon: '🏢', color: 'text-green-600', bg: 'bg-green-50' },
-                    { label: 'Events', value: stats?.totalEvents ?? 0, icon: '📅', color: 'text-purple-600', bg: 'bg-purple-50' },
+                    { label: 'Volunteers', value: stats?.totalVolunteers ?? 0, icon: '👥', color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-500/10' },
+                    { label: 'Organizations', value: stats?.totalOrganizations ?? 0, icon: '🏢', color: 'text-green-600', bg: 'bg-green-50 dark:bg-green-500/10' },
+                    { label: 'Events', value: stats?.totalEvents ?? 0, icon: '📅', color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-500/10' },
                     { label: 'Hours Contributed', value: stats?.totalHours ?? 0, icon: '⏱️', color: 'text-amber-600', bg: 'bg-amber-50' },
                   ].map(s => (
                     <div key={s.label} className={`${s.bg} rounded-2xl p-5 text-center`}>
                       <div className="text-3xl mb-2">{s.icon}</div>
                       <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
-                      <div className="text-xs text-gray-500 mt-1">{s.label}</div>
+                      <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">{s.label}</div>
                     </div>
                   ))}
                 </div>
@@ -237,45 +258,45 @@ export default function AdminDashboard() {
                     { label: 'Pending Orgs', value: stats?.totalOrgsPending ?? 0, color: 'text-yellow-600' },
                     { label: 'Events Completed', value: stats?.totalEventsCompleted ?? 0, color: 'text-green-600' },
                   ].map(s => (
-                    <div key={s.label} className="bg-white border border-gray-100 rounded-xl p-3 text-center">
+                    <div key={s.label} className="bg-white border border-gray-100 dark:border-slate-800 rounded-xl p-3 text-center">
                       <div className={`text-lg font-bold ${s.color}`}>{s.value}</div>
-                      <div className="text-xs text-gray-400">{s.label}</div>
+                      <div className="text-xs text-gray-400 dark:text-slate-500">{s.label}</div>
                     </div>
                   ))}
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6 mb-8">
-                  <div className="bg-white rounded-2xl shadow p-6">
-                    <h3 className="font-bold text-gray-800 mb-4">📈 Volunteer Growth (6 months)</h3>
+                  <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6">
+                    <h3 className="font-bold text-gray-800 dark:text-white mb-4">📈 Volunteer Growth (6 months)</h3>
                     <MiniBarChart data={stats?.volunteerGrowth || []} valueKey="count" labelKey="label" />
                   </div>
-                  <div className="bg-white rounded-2xl shadow p-6">
-                    <h3 className="font-bold text-gray-800 mb-4">🗂️ Events by Category</h3>
+                  <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6">
+                    <h3 className="font-bold text-gray-800 dark:text-white mb-4">🗂️ Events by Category</h3>
                     <MiniPieChart data={stats?.eventsByCategory || []} valueKey="count" labelKey="category" />
                   </div>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6">
-                  <div className="bg-white rounded-2xl shadow p-6">
+                  <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6">
                     <div className="flex justify-between items-center mb-4">
-                      <h3 className="font-bold text-gray-800">⏳ Pending Organizations</h3>
+                      <h3 className="font-bold text-gray-800 dark:text-white">⏳ Pending Organizations</h3>
                       <button onClick={() => setActiveTab('organizations')} className="text-xs text-primary hover:underline">View all →</button>
                     </div>
                     {pendingOrgs.length === 0 ? (
                       <div className="text-center py-8">
                         <p className="text-3xl mb-2">🎉</p>
-                        <p className="text-gray-400 text-sm">All organizations reviewed!</p>
+                        <p className="text-gray-400 dark:text-slate-500 text-sm">All organizations reviewed!</p>
                       </div>
                     ) : (
                       <div className="flex flex-col gap-3">
                         {pendingOrgs.slice(0, 4).map(org => (
-                          <div key={org._id} className="flex justify-between items-center p-3 bg-yellow-50 rounded-xl">
+                          <div key={org._id} className="flex justify-between items-center p-3 bg-yellow-50 dark:bg-yellow-500/10 rounded-xl">
                             <div>
-                              <p className="text-sm font-semibold text-gray-800">{org.orgName}</p>
-                              <p className="text-xs text-gray-500">{org.email} · {org.orgType}</p>
+                              <p className="text-sm font-semibold text-gray-800 dark:text-white">{org.orgName}</p>
+                              <p className="text-xs text-gray-500 dark:text-slate-400">{org.email} · {org.orgType}</p>
                             </div>
                             <div className="flex gap-1">
-                              <button onClick={() => handleVerify(org._id)} className="text-xs bg-green-500 text-white px-2 py-1 rounded-lg">✅</button>
+                              <button onClick={() => handleVerify(org._id)} className="text-xs bg-green-50 dark:bg-green-500/100 text-white px-2 py-1 rounded-lg">✅</button>
                               <button onClick={() => handleReject(org._id)} className="text-xs bg-red-400 text-white px-2 py-1 rounded-lg">❌</button>
                             </div>
                           </div>
@@ -284,16 +305,16 @@ export default function AdminDashboard() {
                     )}
                   </div>
 
-                  <div className="bg-white rounded-2xl shadow p-6">
-                    <h3 className="font-bold text-gray-800 mb-4">🕒 Recent Activity</h3>
+                  <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6">
+                    <h3 className="font-bold text-gray-800 dark:text-white mb-4">🕒 Recent Activity</h3>
                     {activity.length === 0 ? (
-                      <p className="text-gray-400 text-sm text-center py-8">No recent activity</p>
+                      <p className="text-gray-400 dark:text-slate-500 text-sm text-center py-8">No recent activity</p>
                     ) : (
                       <div className="flex flex-col gap-2.5 max-h-72 overflow-y-auto">
                         {activity.map((a, i) => (
                           <div key={i} className="flex justify-between items-start gap-2 text-sm border-b border-gray-50 pb-2 last:border-0">
-                            <span className="text-gray-600">{a.label}</span>
-                            <span className="text-xs text-gray-400 whitespace-nowrap">{new Date(a.at).toLocaleDateString()}</span>
+                            <span className="text-gray-600 dark:text-slate-300">{a.label}</span>
+                            <span className="text-xs text-gray-400 dark:text-slate-500 whitespace-nowrap">{new Date(a.at).toLocaleDateString()}</span>
                           </div>
                         ))}
                       </div>
@@ -313,45 +334,45 @@ export default function AdminDashboard() {
                 type="text" placeholder="🔍 Search by name, email or location..."
                 value={orgSearch}
                 onChange={(e) => { setOrgSearch(e.target.value); setOrgPage(1) }}
-                className="flex-1 border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
+                className="flex-1 border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
               />
               <select value={orgStatus} onChange={(e) => { setOrgStatus(e.target.value); setOrgPage(1) }}
-                className="border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary">
+                className="border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary">
                 <option value="">All status</option>
                 <option value="verified">Verified</option>
                 <option value="pending">Pending</option>
               </select>
             </div>
 
-            {orgLoading && <div className="text-center py-12 text-gray-400">Loading...</div>}
+            {orgLoading && <div className="text-center py-12 text-gray-400 dark:text-slate-500">Loading...</div>}
 
             {!orgLoading && orgs.length === 0 && (
-              <div className="text-center py-16 bg-white rounded-2xl shadow">
+              <div className="text-center py-16 bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none">
                 <p className="text-5xl mb-4">🏢</p>
-                <h3 className="text-lg font-bold text-gray-700">No organizations found</h3>
+                <h3 className="text-lg font-bold text-gray-700 dark:text-slate-300">No organizations found</h3>
               </div>
             )}
 
             {!orgLoading && orgs.map(org => (
-              <div key={org._id} className="bg-white rounded-2xl shadow p-6 flex flex-col md:flex-row justify-between gap-4">
+              <div key={org._id} className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6 flex flex-col md:flex-row justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <h3 className="font-bold text-gray-800">{org.orgName}</h3>
-                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full capitalize">{org.orgType}</span>
+                    <h3 className="font-bold text-gray-800 dark:text-white">{org.orgName}</h3>
+                    <span className="text-xs bg-gray-100 text-gray-600 dark:text-slate-300 px-2 py-0.5 rounded-full capitalize">{org.orgType}</span>
                     {org.isVerified ? (
                       <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Verified</span>
                     ) : (
                       <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">Pending</span>
                     )}
                   </div>
-                  <p className="text-sm text-gray-500">📧 {org.email} &nbsp;|&nbsp; 📍 {org.location}</p>
+                  <p className="text-sm text-gray-500 dark:text-slate-400">📧 {org.email} &nbsp;|&nbsp; 📍 {org.location}</p>
                 </div>
                 <div className="flex flex-wrap gap-2 items-center">
-                  <button onClick={() => openOrgDetails(org._id)} className="text-xs bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition font-semibold">Details</button>
+                  <button onClick={() => openOrgDetails(org._id)} className="text-xs bg-gray-100 text-gray-700 dark:text-slate-300 px-3 py-2 rounded-lg hover:bg-gray-200 transition font-semibold">Details</button>
                   {!org.isVerified && (
                     <>
-                      <button onClick={() => handleVerify(org._id)} className="text-xs bg-green-500 text-white px-3 py-2 rounded-lg hover:bg-green-600 transition font-semibold">✅ Verify</button>
-                      <button onClick={() => handleReject(org._id)} className="text-xs bg-red-50 text-red-500 px-3 py-2 rounded-lg hover:bg-red-100 transition font-semibold">❌ Reject</button>
+                      <button onClick={() => handleVerify(org._id)} className="text-xs bg-green-50 dark:bg-green-500/100 text-white px-3 py-2 rounded-lg hover:bg-green-600 transition font-semibold">✅ Verify</button>
+                      <button onClick={() => handleReject(org._id)} className="text-xs bg-red-50 dark:bg-red-500/10 text-red-500 px-3 py-2 rounded-lg hover:bg-red-100 transition font-semibold">❌ Reject</button>
                     </>
                   )}
                 </div>
@@ -372,15 +393,15 @@ export default function AdminDashboard() {
                 type="text" placeholder="🔍 Search title or org..."
                 value={eventSearch}
                 onChange={(e) => { setEventSearch(e.target.value); setEventPage(1) }}
-                className="border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary md:col-span-2"
+                className="border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary md:col-span-2"
               />
               <select value={eventCategory} onChange={(e) => { setEventCategory(e.target.value); setEventPage(1) }}
-                className="border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary">
+                className="border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary">
                 <option value="">All categories</option>
                 {CATEGORIES.map(c => <option key={c} value={c} className="capitalize">{c}</option>)}
               </select>
               <select value={eventStatus} onChange={(e) => { setEventStatus(e.target.value); setEventPage(1) }}
-                className="border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary">
+                className="border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary">
                 <option value="">All statuses</option>
                 {EVENT_STATUSES.map(s => <option key={s} value={s} className="capitalize">{s}</option>)}
               </select>
@@ -389,31 +410,31 @@ export default function AdminDashboard() {
               type="text" placeholder="📍 Filter by location..."
               value={eventLocation}
               onChange={(e) => { setEventLocation(e.target.value); setEventPage(1) }}
-              className="border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary md:w-64"
+              className="border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary md:w-64"
             />
 
-            {eventLoading && <div className="text-center py-12 text-gray-400">Loading...</div>}
+            {eventLoading && <div className="text-center py-12 text-gray-400 dark:text-slate-500">Loading...</div>}
 
             {!eventLoading && events.length === 0 && (
-              <div className="text-center py-16 bg-white rounded-2xl shadow">
+              <div className="text-center py-16 bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none">
                 <p className="text-5xl mb-4">📅</p>
-                <h3 className="text-lg font-bold text-gray-700">No events found</h3>
+                <h3 className="text-lg font-bold text-gray-700 dark:text-slate-300">No events found</h3>
               </div>
             )}
 
             {!eventLoading && events.map(e => (
-              <div key={e._id} className="bg-white rounded-2xl shadow p-5 flex flex-col md:flex-row justify-between gap-3">
+              <div key={e._id} className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-5 flex flex-col md:flex-row justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <h3 className="font-bold text-gray-800">{e.title}</h3>
-                    <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${STATUS_BADGE[e.status] || 'bg-gray-100 text-gray-600'}`}>{e.status}</span>
-                    <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full capitalize">{e.category}</span>
+                    <h3 className="font-bold text-gray-800 dark:text-white">{e.title}</h3>
+                    <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${STATUS_BADGE[e.status] || 'bg-gray-100 text-gray-600 dark:text-slate-300'}`}>{e.status}</span>
+                    <span className="text-xs bg-blue-50 dark:bg-blue-500/10 text-blue-600 px-2 py-0.5 rounded-full capitalize">{e.category}</span>
                   </div>
-                  <p className="text-sm text-gray-500">🏢 {e.orgName} &nbsp;|&nbsp; 📍 {e.location} &nbsp;|&nbsp; 📅 {new Date(e.date).toLocaleDateString()}</p>
+                  <p className="text-sm text-gray-500 dark:text-slate-400">🏢 {e.orgName} &nbsp;|&nbsp; 📍 {e.location} &nbsp;|&nbsp; 📅 {new Date(e.date).toLocaleDateString()}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="font-bold text-gray-800">{e.registeredCount}/{e.volunteersNeeded}</p>
-                  <p className="text-xs text-gray-400">registered</p>
+                  <p className="font-bold text-gray-800 dark:text-white">{e.registeredCount}/{e.volunteersNeeded}</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500">registered</p>
                 </div>
               </div>
             ))}
@@ -432,35 +453,35 @@ export default function AdminDashboard() {
                 type="text" placeholder="🔍 Search by name, email or location..."
                 value={volSearch}
                 onChange={(e) => { setVolSearch(e.target.value); setVolPage(1) }}
-                className="flex-1 border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
+                className="flex-1 border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
               />
               <select value={volStatus} onChange={(e) => { setVolStatus(e.target.value); setVolPage(1) }}
-                className="border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary">
+                className="border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary">
                 <option value="">All status</option>
                 <option value="active">Active</option>
               </select>
             </div>
 
-            {volLoading && <div className="text-center py-12 text-gray-400">Loading...</div>}
+            {volLoading && <div className="text-center py-12 text-gray-400 dark:text-slate-500">Loading...</div>}
 
             {!volLoading && volunteers.length === 0 && (
-              <div className="text-center py-16 bg-white rounded-2xl shadow">
+              <div className="text-center py-16 bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none">
                 <p className="text-5xl mb-4">👥</p>
-                <h3 className="text-lg font-bold text-gray-700">No volunteers found</h3>
+                <h3 className="text-lg font-bold text-gray-700 dark:text-slate-300">No volunteers found</h3>
               </div>
             )}
 
             {!volLoading && volunteers.map(vol => (
-              <div key={vol._id} className="bg-white rounded-2xl shadow p-6 flex flex-col md:flex-row justify-between gap-4">
+              <div key={vol._id} className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-6 flex flex-col md:flex-row justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <h3 className="font-bold text-gray-800">{vol.name}</h3>
+                    <h3 className="font-bold text-gray-800 dark:text-white">{vol.name}</h3>
                     <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full capitalize">{vol.availability}</span>
                   </div>
-                  <p className="text-sm text-gray-500">📧 {vol.email} &nbsp;|&nbsp; 📍 {vol.location}</p>
+                  <p className="text-sm text-gray-500 dark:text-slate-400">📧 {vol.email} &nbsp;|&nbsp; 📍 {vol.location}</p>
                   <div className="flex flex-wrap gap-2 mt-2">
                     {vol.skills?.slice(0, 4).map(skill => (
-                      <span key={skill} className="bg-blue-50 text-blue-600 text-xs px-2 py-1 rounded-full">{skill}</span>
+                      <span key={skill} className="bg-blue-50 dark:bg-blue-500/10 text-blue-600 text-xs px-2 py-1 rounded-full">{skill}</span>
                     ))}
                   </div>
                 </div>
@@ -470,8 +491,8 @@ export default function AdminDashboard() {
                     <p className="text-xs opacity-80">Score</p>
                   </div>
                   <div className="flex gap-1.5 flex-wrap justify-end">
-                    <button onClick={() => openVolunteerDetails(vol._id)} className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-200 transition font-semibold">Details</button>
-                    <button onClick={() => handleDeleteVolunteer(vol._id)} className="text-xs bg-red-50 text-red-500 px-3 py-1.5 rounded-lg hover:bg-red-100 transition font-semibold">🗑️ Delete</button>
+                    <button onClick={() => openVolunteerDetails(vol._id)} className="text-xs bg-gray-100 text-gray-700 dark:text-slate-300 px-3 py-1.5 rounded-lg hover:bg-gray-200 transition font-semibold">Details</button>
+                    <button onClick={() => handleDeleteVolunteer(vol._id)} className="text-xs bg-red-50 dark:bg-red-500/10 text-red-500 px-3 py-1.5 rounded-lg hover:bg-red-100 transition font-semibold">🗑️ Delete</button>
                   </div>
                 </div>
               </div>
@@ -479,6 +500,26 @@ export default function AdminDashboard() {
 
             {!volLoading && volunteers.length > 0 && (
               <Pagination page={volPage} totalPages={volTotalPages} onChange={setVolPage} />
+            )}
+          </div>
+        )}
+
+        {/* ============ EDIT PROFILE ============ */}
+        {activeTab === 'edit profile' && (
+          <div className="max-w-2xl">
+            {profileLoading && !adminProfile ? (
+              <div className="text-center py-16 bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none">
+                <p className="text-gray-400 dark:text-slate-500 text-sm">Loading your profile...</p>
+              </div>
+            ) : (
+              <EditAdminProfileForm
+                profile={adminProfile}
+                onUpdate={(updated) => {
+                  setAdminProfile(updated)
+                  showNotification('✅ Profile updated successfully!')
+                  setActiveTab('overview')
+                }}
+              />
             )}
           </div>
         )}
@@ -491,7 +532,7 @@ export default function AdminDashboard() {
           onClick={() => setDetailModal(null)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6"
+            className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6"
             onClick={(e) => e.stopPropagation()}
           >
 
@@ -499,19 +540,19 @@ export default function AdminDashboard() {
             {detailModal.type === "org" && (
               <>
                 <div className="flex justify-between items-start mb-4">
-                  <h2 className="text-xl font-bold text-gray-800">
+                  <h2 className="text-xl font-bold text-gray-800 dark:text-white">
                     {detailModal.data.organization?.orgName}
                   </h2>
 
                   <button
                     onClick={() => setDetailModal(null)}
-                    className="text-gray-400 hover:text-gray-600 text-xl"
+                    className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:text-slate-300 text-xl"
                   >
                     ✕
                   </button>
                 </div>
 
-                <div className="space-y-2 text-sm text-gray-600 mb-5">
+                <div className="space-y-2 text-sm text-gray-600 dark:text-slate-300 mb-5">
 
                   <p>📧 {detailModal.data.organization?.email}</p>
 
@@ -546,7 +587,7 @@ export default function AdminDashboard() {
                     <p>{detailModal.data.organization.description}</p>
                   )}
 
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-gray-400 dark:text-slate-500">
                     Registered on{" "}
                     {new Date(
                       detailModal.data.organization?.createdAt
@@ -554,14 +595,14 @@ export default function AdminDashboard() {
                   </p>
                 </div>
 
-                <h3 className="font-semibold text-gray-700 mb-2">
+                <h3 className="font-semibold text-gray-700 dark:text-slate-300 mb-2">
                   Events ({detailModal.data.events?.length ?? 0})
                 </h3>
 
                 <div className="space-y-2 max-h-40 overflow-y-auto mb-5">
 
                   {(detailModal.data.events?.length ?? 0) === 0 && (
-                    <p className="text-gray-400 text-sm">
+                    <p className="text-gray-400 dark:text-slate-500 text-sm">
                       No events available.
                     </p>
                   )}
@@ -569,14 +610,14 @@ export default function AdminDashboard() {
                   {detailModal.data.events?.map((event) => (
                     <div
                       key={event._id}
-                      className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"
+                      className="flex justify-between bg-gray-50 dark:bg-slate-800/60 rounded-lg px-3 py-2"
                     >
                       <span>{event.title}</span>
 
                       <span
                         className={`text-xs px-2 py-1 rounded-full capitalize ${
                           STATUS_BADGE[event.status] ??
-                          "bg-gray-100 text-gray-600"
+                          "bg-gray-100 text-gray-600 dark:text-slate-300"
                         }`}
                       >
                         {event.status}
@@ -593,20 +634,20 @@ export default function AdminDashboard() {
               <>
                 <div className="flex justify-between items-start mb-4">
 
-                  <h2 className="text-xl font-bold text-gray-800">
+                  <h2 className="text-xl font-bold text-gray-800 dark:text-white">
                     {detailModal.data.volunteer?.name}
                   </h2>
 
                   <button
                     onClick={() => setDetailModal(null)}
-                    className="text-gray-400 hover:text-gray-600 text-xl"
+                    className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:text-slate-300 text-xl"
                   >
                     ✕
                   </button>
 
                 </div>
 
-                <div className="space-y-2 text-sm text-gray-600 mb-5">
+                <div className="space-y-2 text-sm text-gray-600 dark:text-slate-300 mb-5">
 
                   <p>
                     📧 {detailModal.data.volunteer?.email}
@@ -656,7 +697,7 @@ export default function AdminDashboard() {
                 <div className="space-y-2 max-h-40 overflow-y-auto mb-5">
 
                   {(detailModal.data.registrations?.length ?? 0) === 0 && (
-                    <p className="text-gray-400 text-sm">
+                    <p className="text-gray-400 dark:text-slate-500 text-sm">
                       No registrations.
                     </p>
                   )}
@@ -665,11 +706,11 @@ export default function AdminDashboard() {
 
                     <div
                       key={registration.eventId}
-                      className="flex justify-between bg-gray-50 rounded-lg px-3 py-2"
+                      className="flex justify-between bg-gray-50 dark:bg-slate-800/60 rounded-lg px-3 py-2"
                     >
                       <span>{registration.title}</span>
 
-                      <span className="text-xs text-gray-500 capitalize">
+                      <span className="text-xs text-gray-500 dark:text-slate-400 capitalize">
                         {registration.registrationStatus}
                       </span>
                     </div>
@@ -704,10 +745,10 @@ function Pagination({ page, totalPages, onChange }) {
   return (
     <div className="flex justify-center items-center gap-3 mt-2">
       <button onClick={() => onChange(p => Math.max(1, p - 1))} disabled={page === 1}
-        className="px-4 py-2 rounded-xl border text-sm font-semibold disabled:opacity-40 hover:bg-gray-50">← Prev</button>
-      <span className="text-sm text-gray-600">Page {page} of {totalPages}</span>
+        className="px-4 py-2 rounded-xl border text-sm font-semibold disabled:opacity-40 hover:bg-gray-50 dark:bg-slate-800/60">← Prev</button>
+      <span className="text-sm text-gray-600 dark:text-slate-300">Page {page} of {totalPages}</span>
       <button onClick={() => onChange(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-        className="px-4 py-2 rounded-xl border text-sm font-semibold disabled:opacity-40 hover:bg-gray-50">Next →</button>
+        className="px-4 py-2 rounded-xl border text-sm font-semibold disabled:opacity-40 hover:bg-gray-50 dark:bg-slate-800/60">Next →</button>
     </div>
   )
 }

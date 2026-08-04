@@ -8,6 +8,8 @@ const {
   updateVolunteerProfile,
   getOrgProfile,
   updateOrgProfile,
+  getAdminProfile,
+  updateAdminProfile,
   getPendingOrgs,
   verifyOrganization,
   rejectOrganization,
@@ -35,6 +37,8 @@ router.get('/org/profile', protect, getOrgProfile)
 router.put('/org/profile', protect, updateOrgProfile)
 
 // Admin protected
+router.get('/admin/profile', protect, adminOnly, getAdminProfile)
+router.put('/admin/profile', protect, adminOnly, updateAdminProfile)
 router.get('/admin/orgs/pending', protect, adminOnly, getPendingOrgs)
 router.put('/admin/orgs/verify/:id', protect, adminOnly, verifyOrganization)
 router.delete('/admin/orgs/reject/:id', protect, adminOnly, rejectOrganization)

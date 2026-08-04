@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import API from '../api'
 
-// FIXED: Moved Input out of the main render function to prevent loss of focus
 const Input = ({ label, name, type = 'text', placeholder, value, onChange, errors }) => {
   const isPassword = type === 'password'
   const [showPassword, setShowPassword] = useState(false)
@@ -39,14 +38,11 @@ const Input = ({ label, name, type = 'text', placeholder, value, onChange, error
   )
 }
 
-export default function EditProfileForm({ profile, onUpdate }) {
+export default function EditAdminProfileForm({ profile, onUpdate }) {
   const [formData, setFormData] = useState({
     name: profile?.name || '',
     phone: profile?.phone || '',
     location: profile?.location || '',
-    skills: profile?.skills?.join(', ') || '',
-    availability: profile?.availability || '',
-    languages: profile?.languages?.join(', ') || '',
     currentPassword: '',
     newPassword: '',
   })
@@ -66,8 +62,6 @@ export default function EditProfileForm({ profile, onUpdate }) {
     if (!formData.name.trim()) e.name = 'Name is required'
     if (!formData.phone.match(/^[0-9]{10}$/)) e.phone = 'Enter valid 10-digit number'
     if (!formData.location.trim()) e.location = 'Location is required'
-    if (!formData.skills.trim()) e.skills = 'At least one skill required'
-    if (!formData.availability) e.availability = 'Select availability'
     if (formData.newPassword && !formData.currentPassword) {
       e.currentPassword = 'Enter current password to change password'
     }
@@ -84,7 +78,7 @@ export default function EditProfileForm({ profile, onUpdate }) {
 
     setLoading(true)
     try {
-      const res = await API.put('/auth/volunteer/profile', formData)
+      const res = await API.put('/auth/admin/profile', formData)
       onUpdate(res.data.user)
     } catch (err) {
       setServerError(err.response?.data?.message || 'Update failed')
@@ -95,7 +89,7 @@ export default function EditProfileForm({ profile, onUpdate }) {
 
   return (
     <div className="bg-white dark:bg-[#151D2A] dark:border dark:border-slate-800 rounded-2xl shadow p-6 max-w-2xl transition-colors duration-300">
-      <h3 className="font-bold text-gray-800 dark:text-white text-lg mb-6">✏️ Edit Your Profile</h3>
+      <h3 className="font-bold text-gray-800 dark:text-white text-lg mb-6">✏️ Edit Admin Profile</h3>
 
       {serverError && (
         <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-300 text-sm px-4 py-3 rounded-xl mb-4">
@@ -108,28 +102,8 @@ export default function EditProfileForm({ profile, onUpdate }) {
           <Input label="Full Name" name="name" placeholder="Your name" value={formData.name} onChange={handleChange} errors={errors} />
           <Input label="Phone Number" name="phone" placeholder="9876543210" value={formData.phone} onChange={handleChange} errors={errors} />
           <Input label="Location (City)" name="location" placeholder="Chennai" value={formData.location} onChange={handleChange} errors={errors} />
-
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1 block">Availability</label>
-            <select name="availability" value={formData.availability} onChange={handleChange}
-              className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none transition
-                bg-white text-gray-900 dark:bg-slate-800 dark:text-white
-                focus:ring-2 focus:ring-primary
-                ${errors.availability ? 'border-red-400' : 'border-gray-300 dark:border-slate-700'}`}>
-              <option value="">-- Select --</option>
-              <option value="weekdays">Weekdays</option>
-              <option value="weekends">Weekends</option>
-              <option value="both">Both</option>
-              <option value="flexible">Flexible</option>
-            </select>
-            {errors.availability && <p className="text-red-500 dark:text-red-400 text-xs mt-1">{errors.availability}</p>}
-          </div>
         </div>
 
-        <Input label="Skills (comma separated)" name="skills" placeholder="Teaching, Python, First Aid" value={formData.skills} onChange={handleChange} errors={errors} />
-        <Input label="Languages (comma separated)" name="languages" placeholder="English, Tamil" value={formData.languages} onChange={handleChange} errors={errors} />
-
-        {/* Password Change Section */}
         <div className="border-t border-gray-200 dark:border-slate-700 pt-4 mt-2">
           <div className="flex justify-between items-center mb-3">
             <p className="text-sm font-semibold text-gray-700 dark:text-slate-300">🔒 Change Password (optional)</p>

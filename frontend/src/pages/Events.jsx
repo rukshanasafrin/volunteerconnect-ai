@@ -32,6 +32,7 @@ import {
 } from 'lucide-react'
 
 import API from '../api'
+import socket from '../socket'
 import { useAuth } from '../context/AuthContext'
 
 // -------------------------------------------------------------------------
@@ -163,6 +164,20 @@ export default function Events() {
 
   const [registeringId, setRegisteringId] = useState(null)
   const [feedback, setFeedback] = useState(null)
+  const [isLive, setIsLive] = useState(socket.connected)
+
+  useEffect(() => {
+    const handleConnect = () => setIsLive(true)
+    const handleDisconnect = () => setIsLive(false)
+
+    socket.on('connect', handleConnect)
+    socket.on('disconnect', handleDisconnect)
+
+    return () => {
+      socket.off('connect', handleConnect)
+      socket.off('disconnect', handleDisconnect)
+    }
+  }, [])
 
   // Debounce the free-text search so we don't hammer the API on every keystroke.
   useEffect(() => {
@@ -198,6 +213,34 @@ export default function Events() {
 
   useEffect(() => {
     fetchEvents()
+  }, [fetchEvents])
+
+  // Live updates: new events appear instantly, open/closed status and
+  // volunteer counts update the moment someone registers, no refresh needed.
+  useEffect(() => {
+    const handleNewEvent = () => fetchEvents()
+
+    const handleEventUpdated = (patch) => {
+      setEvents((prev) =>
+        prev.map((event) =>
+          event._id === patch._id ? { ...event, ...patch } : event
+        )
+      )
+    }
+
+    const handleEventDeleted = ({ _id }) => {
+      setEvents((prev) => prev.filter((event) => event._id !== _id))
+    }
+
+    socket.on('event:new', handleNewEvent)
+    socket.on('event:updated', handleEventUpdated)
+    socket.on('event:deleted', handleEventDeleted)
+
+    return () => {
+      socket.off('event:new', handleNewEvent)
+      socket.off('event:updated', handleEventUpdated)
+      socket.off('event:deleted', handleEventDeleted)
+    }
   }, [fetchEvents])
 
   const visibleEvents = useMemo(() => {
@@ -292,6 +335,21 @@ export default function Events() {
               <span className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-primary dark:border-white/10 dark:bg-white/5 dark:text-white">
                 <CalendarDays size={14} />
                 Volunteering opportunities
+              </span>
+
+              <span
+                className={`ml-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
+                  isLive
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                    : 'bg-slate-100 text-slate-500 dark:bg-slate-500/10 dark:text-slate-400'
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    isLive ? 'animate-pulse bg-emerald-500' : 'bg-slate-400'
+                  }`}
+                />
+                {isLive ? 'Live updates on' : 'Reconnecting…'}
               </span>
 
               <h1 className="mt-5 text-3xl font-extrabold tracking-tight text-primary sm:text-4xl lg:text-5xl dark:text-white">
