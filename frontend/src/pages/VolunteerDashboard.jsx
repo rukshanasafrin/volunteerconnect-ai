@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import EditProfileForm from '../components/EditProfileForm'
+import ThemeToggle from '../components/ThemeToggle'
+import VoiceSearchButton from '../components/VoiceSearchButton'
 import API from '../api'
 import socket from '../socket'
 
@@ -31,6 +33,24 @@ export default function VolunteerDashboard() {
   const [leaderboardLoading, setLeaderboardLoading] = useState(false)
   const [leaderboardSort, setLeaderboardSort] = useState('performanceScore')
   const [myRank, setMyRank] = useState(null)
+  const [eventSearchInput, setEventSearchInput] = useState('')
+  const [eventSearch, setEventSearch] = useState('')
+  const [eventCategoryFilter, setEventCategoryFilter] = useState('all')
+  const [eventStatusFilter, setEventStatusFilter] = useState('all')
+  // Skips the debounce below once, right after a voice search sets both the
+  // display text and the cleaned search text together, so the debounce
+  // doesn't overwrite the cleaned text with the raw (unfiltered) transcript.
+  const skipNextDebounceRef = useRef(false)
+
+  // Debounce the free-text event search so we don't re-filter on every keystroke.
+  useEffect(() => {
+    if (skipNextDebounceRef.current) {
+      skipNextDebounceRef.current = false
+      return
+    }
+    const timer = setTimeout(() => setEventSearch(eventSearchInput.trim().toLowerCase()), 300)
+    return () => clearTimeout(timer)
+  }, [eventSearchInput])
 
   useEffect(() => {
     fetchAll()
@@ -85,7 +105,7 @@ export default function VolunteerDashboard() {
       setLoading(true)
       const [profileRes, eventsRes, myEventsRes] = await Promise.all([
         API.get('/auth/volunteer/profile'),
-        API.get('/events'),
+        API.get('/events?limit=100'),
         API.get('/events/volunteer/my-events'),
       ])
       setProfile(profileRes.data)
@@ -240,6 +260,39 @@ export default function VolunteerDashboard() {
       .filter(group => group.events.length > 0)
   }
 
+  // Search + category + open/closed filtering for the "events" tab — the same
+  // kind of event search available on the public Home/Events pages, now
+  // available without leaving the dashboard.
+  const filteredEvents = useMemo(() => {
+    return events.filter(event => {
+      const matchesSearch =
+        !eventSearch ||
+        event.title?.toLowerCase().includes(eventSearch) ||
+        event.orgName?.toLowerCase().includes(eventSearch) ||
+        event.location?.toLowerCase().includes(eventSearch)
+
+      const matchesCategory =
+        eventCategoryFilter === 'all' || event.category === eventCategoryFilter
+
+      const isOpen = getEventOpenStatus(event)
+      const matchesStatus =
+        eventStatusFilter === 'all' ||
+        (eventStatusFilter === 'open' ? isOpen : !isOpen)
+
+      return matchesSearch && matchesCategory && matchesStatus
+    })
+  }, [events, eventSearch, eventCategoryFilter, eventStatusFilter])
+
+  const hasActiveEventFilters =
+    Boolean(eventSearch) || eventCategoryFilter !== 'all' || eventStatusFilter !== 'all'
+
+  const clearEventFilters = () => {
+    setEventSearchInput('')
+    setEventSearch('')
+    setEventCategoryFilter('all')
+    setEventStatusFilter('all')
+  }
+
   const tabs = ['overview', 'events', 'my events', 'certificates', 'performance', 'leaderboard', 'edit profile']
 
   const LEADERBOARD_SORT_OPTIONS = [
@@ -296,6 +349,7 @@ export default function VolunteerDashboard() {
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600 dark:text-slate-300">👋 Hello, {profile?.name}</span>
           <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-semibold">Volunteer</span>
+          <ThemeToggle />
           <button onClick={handleLogout} className="text-sm bg-red-50 dark:bg-red-500/10 text-red-500 px-4 py-2 rounded-lg hover:bg-red-100 transition">
             Logout
           </button>
@@ -535,10 +589,74 @@ export default function VolunteerDashboard() {
         {activeTab === 'events' && (
           <div className="flex flex-col gap-8">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <h3 className="font-bold text-gray-700 dark:text-slate-300">Available Events ({events.length})</h3>
+              <h3 className="font-bold text-gray-700 dark:text-slate-300">
+                Available Events ({filteredEvents.length}{hasActiveEventFilters ? ` of ${events.length}` : ''})
+              </h3>
               <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
-                {events.filter(getEventOpenStatus).length} open
+                {filteredEvents.filter(getEventOpenStatus).length} open
               </span>
+            </div>
+
+            {/* Search + Filters */}
+            <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-4 flex flex-col gap-3">
+              <div className="flex flex-col md:flex-row gap-3">
+                <input
+                  type="text"
+                  value={eventSearchInput}
+                  onChange={(e) => setEventSearchInput(e.target.value)}
+                  placeholder='🔍 Search events, or tap the mic and say "open environment events"...'
+                  className="flex-1 border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                />
+                <VoiceSearchButton
+                  onParsedQuery={({ searchText, category, status }, rawTranscript) => {
+                    // Show exactly what was said; apply the derived filters
+                    // silently and use the cleaned text for actual matching.
+                    skipNextDebounceRef.current = true
+                    setEventSearchInput(rawTranscript)
+                    setEventSearch(searchText)
+                    setEventCategoryFilter(category)
+                    setEventStatusFilter(status)
+                  }}
+                />
+                <select
+                  value={eventCategoryFilter}
+                  onChange={(e) => setEventCategoryFilter(e.target.value)}
+                  className="border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-slate-800 text-gray-900 dark:text-white md:w-56"
+                >
+                  <option value="all">All categories</option>
+                  {EVENT_CATEGORY_META.map(c => (
+                    <option key={c.key} value={c.key}>{c.emoji} {c.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {[
+                  { key: 'all', label: 'All' },
+                  { key: 'open', label: '🟢 Open' },
+                  { key: 'closed', label: '🔒 Closed' },
+                ].map(status => (
+                  <button
+                    key={status.key}
+                    type="button"
+                    onClick={() => setEventStatusFilter(status.key)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition
+                      ${eventStatusFilter === status.key
+                        ? 'bg-primary text-white'
+                        : 'bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700'}`}
+                  >
+                    {status.label}
+                  </button>
+                ))}
+                {hasActiveEventFilters && (
+                  <button
+                    type="button"
+                    onClick={clearEventFilters}
+                    className="ml-auto text-xs font-semibold text-gray-400 dark:text-slate-500 hover:text-red-500 transition"
+                  >
+                    ✕ Clear filters
+                  </button>
+                )}
+              </div>
             </div>
 
             {events.length === 0 ? (
@@ -547,8 +665,20 @@ export default function VolunteerDashboard() {
                 <h3 className="text-lg font-bold text-gray-700 dark:text-slate-300">No Events Available Yet</h3>
                 <p className="text-gray-400 dark:text-slate-500 text-sm mt-2">Events will appear here once organizations post them.</p>
               </div>
+            ) : filteredEvents.length === 0 ? (
+              <div className="text-center py-16 bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none">
+                <p className="text-5xl mb-4">🔍</p>
+                <h3 className="text-lg font-bold text-gray-700 dark:text-slate-300">No events match your filters</h3>
+                <button
+                  type="button"
+                  onClick={clearEventFilters}
+                  className="mt-4 text-sm font-semibold text-primary hover:underline"
+                >
+                  Clear all filters
+                </button>
+              </div>
             ) : (
-              groupEventsByCategory(events).map(({ meta, events: categoryEvents }) => (
+              groupEventsByCategory(filteredEvents).map(({ meta, events: categoryEvents }) => (
                 <div key={meta.key}>
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-xl">{meta.emoji}</span>

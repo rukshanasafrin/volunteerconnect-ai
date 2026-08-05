@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 
@@ -34,6 +35,7 @@ import {
 import API from '../api'
 import socket from '../socket'
 import { useAuth } from '../context/AuthContext'
+import VoiceSearchButton from '../components/VoiceSearchButton'
 
 // -------------------------------------------------------------------------
 // Static reference data — category presentation only. All events, counts,
@@ -161,6 +163,10 @@ export default function Events() {
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')
   const [activeStatus, setActiveStatus] = useState('all')
+  // When voice search sets searchInput + search together, skip the debounce
+  // effect once so it doesn't overwrite the cleaned search text with the
+  // raw (filler-word-included) transcript 400ms later.
+  const skipNextDebounceRef = useRef(false)
 
   const [registeringId, setRegisteringId] = useState(null)
   const [feedback, setFeedback] = useState(null)
@@ -181,6 +187,11 @@ export default function Events() {
 
   // Debounce the free-text search so we don't hammer the API on every keystroke.
   useEffect(() => {
+    if (skipNextDebounceRef.current) {
+      skipNextDebounceRef.current = false
+      return
+    }
+
     const timer = setTimeout(() => {
       setSearch(searchInput.trim())
     }, 400)
@@ -371,17 +382,32 @@ export default function Events() {
               className="glass-panel mt-9 rounded-3xl p-4 shadow-soft sm:p-5"
             >
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="relative flex-1 lg:max-w-sm">
-                  <Search
-                    size={18}
-                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                  />
-                  <input
-                    type="text"
-                    value={searchInput}
-                    onChange={(event) => setSearchInput(event.target.value)}
-                    placeholder="Search events by title..."
-                    className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm font-medium text-slate-800 outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                <div className="flex flex-1 items-center gap-2 lg:max-w-sm">
+                  <div className="relative flex-1">
+                    <Search
+                      size={18}
+                      className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                      type="text"
+                      value={searchInput}
+                      onChange={(event) => setSearchInput(event.target.value)}
+                      placeholder='Search, or tap the mic and say "open health events"...'
+                      className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm font-medium text-slate-800 outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <VoiceSearchButton
+                    onParsedQuery={({ searchText, category, status }, rawTranscript) => {
+                      // Show exactly what was said in the box — only the
+                      // derived category/status filters are applied silently,
+                      // and the *cleaned* text (filler words stripped) is what
+                      // actually gets sent to the API as the search query.
+                      skipNextDebounceRef.current = true
+                      setSearchInput(rawTranscript)
+                      setSearch(searchText)
+                      setActiveCategory(category)
+                      setActiveStatus(status)
+                    }}
                   />
                 </div>
 

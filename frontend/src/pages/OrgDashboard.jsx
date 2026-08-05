@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import EditOrgProfileForm from '../components/EditOrgProfileForm'
+import ThemeToggle from '../components/ThemeToggle'
+import VoiceSearchButton from '../components/VoiceSearchButton'
 import API from '../api'
 import socket from '../socket'
 
@@ -31,6 +33,10 @@ export default function OrgDashboard() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [eventSearchInput, setEventSearchInput] = useState('')
+  const [eventSearch, setEventSearch] = useState('')
+  const [eventCategoryFilter, setEventCategoryFilter] = useState('all')
+  const [eventLifecycleFilter, setEventLifecycleFilter] = useState('all')
   const [notification, setNotification] = useState('')
   const [aiRecommendations, setAiRecommendations] = useState({})
   const [aiLoadingId, setAiLoadingId] = useState(null)
@@ -45,6 +51,20 @@ export default function OrgDashboard() {
   })
   const [formErrors, setFormErrors] = useState({})
   const [creating, setCreating] = useState(false)
+  // Skips the debounce below once, right after a voice search sets both the
+  // display text and the cleaned search text together, so the debounce
+  // doesn't overwrite the cleaned text with the raw (unfiltered) transcript.
+  const skipNextDebounceRef = useRef(false)
+
+  // Debounce the free-text event search so filtering doesn't run on every keystroke.
+  useEffect(() => {
+    if (skipNextDebounceRef.current) {
+      skipNextDebounceRef.current = false
+      return
+    }
+    const timer = setTimeout(() => setEventSearch(eventSearchInput.trim().toLowerCase()), 300)
+    return () => clearTimeout(timer)
+  }, [eventSearchInput])
 
   useEffect(() => { fetchAll() }, [])
 
@@ -242,6 +262,38 @@ export default function OrgDashboard() {
       .filter(group => group.events.length > 0)
   }
 
+  // Search + category + status filtering for the "events" tab — mirrors the
+  // event search on the public Home/Events pages, scoped to this org's own events.
+  const filteredEvents = useMemo(() => {
+    return events.filter(event => {
+      const matchesSearch =
+        !eventSearch ||
+        event.title?.toLowerCase().includes(eventSearch) ||
+        event.location?.toLowerCase().includes(eventSearch) ||
+        event.category?.toLowerCase().includes(eventSearch)
+
+      const matchesCategory =
+        eventCategoryFilter === 'all' || event.category === eventCategoryFilter
+
+      const isOpen = getEventOpenStatus(event)
+      const matchesLifecycle =
+        eventLifecycleFilter === 'all' ||
+        (eventLifecycleFilter === 'open' ? isOpen : !isOpen)
+
+      return matchesSearch && matchesCategory && matchesLifecycle
+    })
+  }, [events, eventSearch, eventCategoryFilter, eventLifecycleFilter])
+
+  const hasActiveEventFilters =
+    Boolean(eventSearch) || eventCategoryFilter !== 'all' || eventLifecycleFilter !== 'all'
+
+  const clearEventFilters = () => {
+    setEventSearchInput('')
+    setEventSearch('')
+    setEventCategoryFilter('all')
+    setEventLifecycleFilter('all')
+  }
+
   const totalVolunteers = events.reduce((acc, e) => acc + (e.registeredVolunteers?.length || 0), 0)
   const tabs = ['overview', 'events', 'volunteers', 'edit profile']
 
@@ -267,6 +319,7 @@ export default function OrgDashboard() {
           <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-semibold capitalize">
             {profile?.orgType}
           </span>
+          <ThemeToggle />
           <button
             onClick={handleLogout}
             className="text-sm bg-red-50 dark:bg-red-500/10 text-red-500 px-4 py-2 rounded-lg hover:bg-red-100 transition"
@@ -540,7 +593,9 @@ export default function OrgDashboard() {
 
             {/* Events List Header */}
             <div className="flex justify-between items-center">
-              <h3 className="font-bold text-gray-700 dark:text-slate-300">Your Events ({events.length})</h3>
+              <h3 className="font-bold text-gray-700 dark:text-slate-300">
+                Your Events ({filteredEvents.length}{hasActiveEventFilters ? ` of ${events.length}` : ''})
+              </h3>
               {!showCreateForm && (
                 <button
                   onClick={() => setShowCreateForm(true)}
@@ -550,6 +605,70 @@ export default function OrgDashboard() {
                 </button>
               )}
             </div>
+
+            {/* Search + Filters */}
+            {events.length > 0 && (
+              <div className="bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none p-4 flex flex-col gap-3">
+                <div className="flex flex-col md:flex-row gap-3">
+                  <input
+                    type="text"
+                    value={eventSearchInput}
+                    onChange={(e) => setEventSearchInput(e.target.value)}
+                    placeholder='🔍 Search your events, or tap the mic and say "open environment events"...'
+                    className="flex-1 border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-secondary bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                  />
+                  <VoiceSearchButton
+                    onParsedQuery={({ searchText, category, status }, rawTranscript) => {
+                      // Show exactly what was said; apply the derived filters
+                      // silently and use the cleaned text for actual matching.
+                      skipNextDebounceRef.current = true
+                      setEventSearchInput(rawTranscript)
+                      setEventSearch(searchText)
+                      setEventCategoryFilter(category)
+                      setEventLifecycleFilter(status)
+                    }}
+                  />
+                  <select
+                    value={eventCategoryFilter}
+                    onChange={(e) => setEventCategoryFilter(e.target.value)}
+                    className="border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-secondary bg-white dark:bg-slate-800 text-gray-900 dark:text-white md:w-56"
+                  >
+                    <option value="all">All categories</option>
+                    {EVENT_CATEGORY_META.map(c => (
+                      <option key={c.key} value={c.key}>{c.emoji} {c.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {[
+                    { key: 'all', label: 'All' },
+                    { key: 'open', label: '🟢 Open' },
+                    { key: 'closed', label: '🔒 Closed' },
+                  ].map(status => (
+                    <button
+                      key={status.key}
+                      type="button"
+                      onClick={() => setEventLifecycleFilter(status.key)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition
+                        ${eventLifecycleFilter === status.key
+                          ? 'bg-secondary text-white'
+                          : 'bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700'}`}
+                    >
+                      {status.label}
+                    </button>
+                  ))}
+                  {hasActiveEventFilters && (
+                    <button
+                      type="button"
+                      onClick={clearEventFilters}
+                      className="ml-auto text-xs font-semibold text-gray-400 dark:text-slate-500 hover:text-red-500 transition"
+                    >
+                      ✕ Clear filters
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {events.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none">
@@ -565,8 +684,20 @@ export default function OrgDashboard() {
                   + Create Event
                 </button>
               </div>
+            ) : filteredEvents.length === 0 ? (
+              <div className="text-center py-16 bg-white rounded-2xl shadow dark:bg-[#151D2A] dark:border dark:border-slate-800 dark:shadow-none">
+                <p className="text-5xl mb-4">🔍</p>
+                <h3 className="text-lg font-bold text-gray-700 dark:text-slate-300">No events match your filters</h3>
+                <button
+                  type="button"
+                  onClick={clearEventFilters}
+                  className="mt-4 text-sm font-semibold text-secondary hover:underline"
+                >
+                  Clear all filters
+                </button>
+              </div>
             ) : (
-              groupEventsByCategory(events).map(({ meta, events: categoryEvents }) => (
+              groupEventsByCategory(filteredEvents).map(({ meta, events: categoryEvents }) => (
                 <div key={meta.key} className="flex flex-col gap-4">
                   <div className="flex items-center gap-2">
                     <span className="text-xl">{meta.emoji}</span>

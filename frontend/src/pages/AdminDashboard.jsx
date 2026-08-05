@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import API from '../api'
 import { MiniBarChart, MiniPieChart } from '../components/AdminCharts'
 import EditAdminProfileForm from '../components/EditAdminProfileForm'
+import ThemeToggle from '../components/ThemeToggle'
 
 const CATEGORIES = ['education', 'environment', 'health', 'community', 'disaster relief', 'animal welfare', 'other']
 const EVENT_STATUSES = ['upcoming', 'ongoing', 'completed', 'cancelled']
@@ -208,6 +209,7 @@ export default function AdminDashboard() {
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600 dark:text-slate-300">👋 {user?.name}</span>
           <span className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-semibold">Admin</span>
+          <ThemeToggle />
           <button onClick={handleLogout} className="text-sm bg-red-50 dark:bg-red-500/10 text-red-500 px-4 py-2 rounded-lg hover:bg-red-100 transition">Logout</button>
         </div>
       </div>
