@@ -1,4 +1,4 @@
-# 🤝 VolunteerConnect AI
+🤝 VolunteerConnect AI
 
 <p align="center">
   <img src="https://img.shields.io/badge/React-19-blue?logo=react" />
@@ -7,229 +7,320 @@
   <img src="https://img.shields.io/badge/TailwindCSS-3.x-38BDF8?logo=tailwindcss" />
 </p>
 
-VolunteerConnect AI is a modern AI-powered volunteer management platform that connects volunteers with organizations through intelligent event matching, performance tracking, sentiment analysis, and streamlined event management.
+### AI-Powered Volunteer–Organization Matching & Management Platform
 
-The platform enables volunteers to discover meaningful opportunities while helping organizations efficiently manage volunteers and events through AI-assisted features.
+VolunteerConnect AI is a full-stack platform that connects volunteers with organizations through **AI-assisted event matching, skill analysis, performance tracking, sentiment analysis, and intelligent volunteer management**.
 
----
-
-# 🌟 Key Features
-
-## 👤 Volunteer
-
-- Secure Registration & Login
-- Profile Management
-- Browse & Search Events
-- Register for Volunteer Events
-- Volunteer Performance Score
-- Feedback Submission
-- Certificate Download
-- AI Chat Assistant 
-- Skill Gap Growth Advisor
+Unlike a basic event management system, the platform uses volunteer profiles, skills, interests, event requirements, participation history, and feedback to provide personalized recommendations and decision-support features.
 
 ---
 
-## 🏢 Organization
+## 🌟 Key Features
 
-- Organization Registration
-- Event Creation & Management
-- Volunteer Approval / Rejection
-- AI Volunteer Matching
-- Event Completion Tracking
-- Feedback Sentiment Analysis
-- Volunteer Analytics
-- AI Dream Team Builder
-- AI Impact Story Generator
+### 👤 Volunteer
 
----
+* Secure registration and login
+* JWT authentication and role-based access
+* Profile and skill management
+* Browse, search, and filter events
+* Register for volunteer opportunities
+* AI-powered event recommendations
+* Volunteer performance score
+* Skill-gap analysis and growth advisor
+* Feedback submission
+* Certificate generation/download
+* AI chat assistant
+* Participation history
 
-## 🛡️ Admin
+### 🏢 Organization
 
-- Organization Verification
-- Volunteer Management
-- Organization Management
-- Event Monitoring
-- Search Users
-- Dashboard Analytics
-- Platform Statistics
+* Organization registration and profile
+* Event creation and management
+* Volunteer approval/rejection
+* AI-powered volunteer matching
+* Applicant performance insights
+* Event completion tracking
+* Feedback sentiment analysis
+* Volunteer analytics
+* AI Dream Team Builder
+* AI Impact Story Generator
 
----
+### 🛡️ Admin
 
-# 🤖 AI Features
-
-- AI Volunteer Recommendation Engine
-- Volunteer Performance Scoring
-- Feedback Sentiment Analysis
-- Smart Event Matching
-- AI Chat Assistant
-- Certificate Generation 
-
----
-
-# 🛠 Tech Stack
-
-## Frontend
-
-- React.js
-- Vite
-- Tailwind CSS
-- Framer Motion
-- Axios
-- React Router DOM
-- Lucide React
+* Organization verification
+* Volunteer management
+* Organization management
+* Event monitoring
+* User search
+* Platform statistics
+* Dashboard analytics
 
 ---
 
-## Backend
+## 🤖 AI Features
 
-- Node.js
-- Express.js
-- MongoDB
-- JWT Authentication
-- Bcrypt
-- Mongoose
+### Intelligent Volunteer Matching
+
+Matches volunteers with suitable events using factors such as:
+
+* Skills
+* Interests
+* Event requirements
+* Previous participation
+* Performance
+
+### Skill Gap Advisor
+
+Compares volunteer skills with event requirements and identifies missing skills with improvement suggestions.
+
+### Sentiment Analysis
+
+Analyzes volunteer feedback to identify positive, negative, and neutral experiences.
+
+### AI Dream Team Builder
+
+Helps organizations identify suitable combinations of volunteers for an event.
+
+### AI Impact Story Generator
+
+Generates meaningful summaries from event and volunteer participation data.
+
+### AI Chat Assistant
+
+Provides contextual assistance for volunteers using the platform's features and opportunities.
 
 ---
 
-## Artificial Intelligence
+## 🛠️ Technology Stack
 
-- Anthropic Claude API
-- Sentiment Analysis
-- AI Volunteer Matching
-- Recommendation Engine
+### Frontend
+
+* React.js
+* Vite
+* Tailwind CSS
+* Framer Motion
+* Axios
+* React Router DOM
+* Lucide React
+* Socket.IO Client
+
+### Backend
+
+* Node.js
+* Express.js
+* MongoDB
+* Mongoose
+* JWT
+* bcrypt
+* Socket.IO
+
+### AI
+
+* Anthropic Claude API
+* Groq API
+* AI Recommendation
+* Sentiment Analysis
+* AI Assistance
 
 ---
 
-# 📂 Project Structure
+## 🏗️ Architecture
 
+```text
+React + Vite Frontend
+        │
+        │ REST API / Socket.IO
+        ▼
+Node.js + Express Backend
+        │
+        ├── Authentication & RBAC
+        ├── Controllers
+        ├── Services
+        ├── AI Services
+        └── Business Logic
+        │
+        ▼
+MongoDB + Mongoose
 ```
-volunteerconnect-ai
+
+AI services are integrated separately from the core business logic so that normal platform functionality does not depend entirely on AI availability.
+
+---
+
+## 🗄️ Database
+
+The project uses **MongoDB with Mongoose**.
+
+MongoDB is suitable because the platform handles flexible data such as:
+
+* Volunteer profiles
+* Skills and interests
+* Organizations
+* Events
+* Applications
+* Feedback
+* Performance information
+* AI-generated insights
+
+MongoDB Atlas can be used for production deployment, while a local MongoDB instance can be used during development.
+
+---
+
+## 🔐 Security
+
+The application implements:
+
+* JWT authentication
+* bcrypt password hashing
+* Role-based authorization
+* Protected routes
+* Input validation
+* CORS configuration
+* Environment-based secrets
+* Secure API key management
+
+API keys and database credentials are stored in `.env` and should never be committed to GitHub.
+
+---
+
+## 📂 Project Structure
+
+```text
+volunteerconnect-ai/
 │
-├── frontend
-│   ├── public
-│   ├── src
-│   │   ├── api
-│   │   ├── assets
-│   │   ├── components
-│   │   ├── context
-│   │   ├── pages
-│   │   ├── routes
-│   │   ├── hooks
-│   │   └── utils
-│   │
-│   ├── package.json
-│   └── vite.config.js
+├── frontend/
+│   ├── public/
+│   └── src/
+│       ├── api/
+│       ├── components/
+│       ├── context/
+│       ├── hooks/
+│       ├── pages/
+│       ├── routes/
+│       └── utils/
 │
-├── backend
-│   ├── config
-│   ├── controllers
-│   ├── middleware
-│   ├── models
-│   ├── routes
-│   ├── services
-│   ├── utils
-│   ├── package.json
+├── backend/
+│   ├── config/
+│   ├── controllers/
+│   ├── middleware/
+│   ├── models/
+│   ├── routes/
+│   ├── services/
 │   └── server.js
 │
+├── .gitignore
 └── README.md
 ```
 
 ---
 
-# 🚀 Getting Started
+## 🚀 Getting Started
 
-## 1️⃣ Clone Repository
+### Clone
 
 ```bash
 git clone https://github.com/rukshanasafrin/volunteerconnect-ai.git
-
 cd volunteerconnect-ai
 ```
 
----
-
-# ⚙ Backend Setup
+### Backend
 
 ```bash
 cd backend
-
 npm install
-```
-
-Create a `.env` file inside the backend folder.
-
-```env
-PORT=PORT_NUMBER
-
-MONGO_URI=YOUR_MONGODB_URL
-
-JWT_SECRET=YOUR_JWT_KEY
-
-ANTHROPIC_API_KEY=YOUR_API_KEY
-
-GROQ_API_KEY=YOUR_GRQO_API_KEY
-```
-
-Start the backend server
-
-```bash
 npm run dev
 ```
 
-Backend runs at
+Backend:
 
-```
+```text
 http://localhost:8000
 ```
 
----
+### Frontend
 
-# 💻 Frontend Setup
+Open another terminal:
 
 ```bash
 cd frontend
-
 npm install
-
 npm run dev
 ```
 
-Frontend runs at
+Frontend:
 
-```
+```text
 http://localhost:5173
 ```
 
 ---
 
-# 🔐 Authentication
+## ⚙️ Environment Variables
 
-The platform uses
+Create `backend/.env`:
 
-- JWT Authentication
-- Password Hashing using Bcrypt
-- Protected Routes
-- Role-Based Authorization
+```env
+PORT=8000
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret
+ANTHROPIC_API_KEY=your_anthropic_api_key
+GROQ_API_KEY=your_groq_api_key
+CLIENT_URL=http://localhost:5173
+```
 
-Supported roles
-
-- Volunteer
-- Organization
-- Admin
+For production, replace `CLIENT_URL` with the deployed frontend URL.
 
 ---
 
+## 🌐 Deployment
 
-# 🚀 Future Enhancements
+The application can be deployed as separate frontend and backend services:
 
-- Socket.IO Real-Time Notifications
-- Achievement Badges
-- Calendar Integration
-- Resume Parsing
-- Email Notifications
-- Analytics Dashboard
-- Multi-language Support
-- Cloud Deployment
-- Mobile App
+```text
+React/Vite
+    ↓
+Frontend Hosting
+    ↓
+Node.js + Express
+    ↓
+MongoDB Atlas
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+Deploy the generated `dist` directory using a suitable frontend hosting service.
+
+### Backend
+
+Deploy the `backend` directory as a Node.js service and configure:
+
+```env
+MONGO_URI
+JWT_SECRET
+ANTHROPIC_API_KEY
+GROQ_API_KEY
+CLIENT_URL
+```
+
+For production, use **MongoDB Atlas** instead of the local MongoDB instance.
+
+---
+
+## 🔮 Future Enhancements
+
+* Advanced ML-based recommendation models
+* Resume parsing and automatic skill extraction
+* Calendar integration
+* Email notifications
+* Achievement badges
+* Mobile application
+* Geographic opportunity matching
+* Predictive volunteer analytics
 
 ---
