@@ -13,7 +13,7 @@ const httpServer = http.createServer(app)
 initSocket(httpServer)
 
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000'],
+  origin: ['http://localhost:5173', 'http://localhost:3000', process.env.CLIENT_URL],
   credentials: true
 }))
 
@@ -55,4 +55,6 @@ process.on('unhandledRejection', (err) => {
 })
 
 const PORT = process.env.PORT || 8000
-httpServer.listen(PORT, () => console.log(`✅ Server running on port ${PORT} (HTTP + WebSocket)`))
+httpServer.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Server running on port ${PORT} (HTTP + WebSocket)`)
+})
