@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import API from '../api'
 import { MiniBarChart, MiniPieChart } from '../components/AdminCharts'
-import EditAdminProfileForm from '../components/EditAdminProfileForm'
+import EditAdminProfileForm from '../components/EditAdminprofileform'
 import ThemeToggle from '../components/ThemeToggle'
 
 const CATEGORIES = ['education', 'environment', 'health', 'community', 'disaster relief', 'animal welfare', 'other']
