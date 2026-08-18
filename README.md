@@ -7,6 +7,8 @@
   <img src="https://img.shields.io/badge/TailwindCSS-3.x-38BDF8?logo=tailwindcss" />
 </p>
 
+Live URL Demo : https://volunteerconnect-ai.vercel.app/
+
 ### AI-Powered Volunteer–Organization Matching & Management Platform
 
 VolunteerConnect AI is a full-stack platform that connects volunteers with organizations through **AI-assisted event matching, skill analysis, performance tracking, sentiment analysis, and intelligent volunteer management**.
